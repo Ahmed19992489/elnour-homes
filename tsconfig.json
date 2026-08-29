@@ -15,6 +15,7 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
+    "types": ["vite/client", "node"],
     "baseUrl": ".",
     "paths": {
       "@/*": ["client/src/*"],
@@ -22,5 +23,5 @@
       "@assets/*": ["attached_assets/*"]
     }
   },
-  "include": ["client/src", "shared", "server", "api"]
+  "include": ["client/src", "shared", "server", "api", "drizzle"]
 }

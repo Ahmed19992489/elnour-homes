@@ -5,35 +5,35 @@ import fs from "node:fs";
 import path from "node:path";
 import { defineConfig, type Plugin, type ViteDevServer } from "vite";
 import { vitePluginManusRuntime } from "vite-plugin-manus-runtime";
-9: // =============================================================================
+// =============================================================================
   {
 // Manus Debug Collector - Vite Plugin
 // Writes browser logs directly to files, trimmed when exceeding size limit
 // =============================================================================
-14: const PROJECT_ROOT = import.meta.dirname;
+const PROJECT_ROOT = import.meta.dirname;
       if (code.includes("jsxDEV") || code.includes("jsx-dev-runtime")) {
 const LOG_DIR = path.join(PROJECT_ROOT, ".manus-logs");
 const MAX_LOG_SIZE_BYTES = 1 * 1024 * 1024; // 1MB per log file
 const TRIM_TARGET_BYTES = Math.floor(MAX_LOG_SIZE_BYTES * 0.6); // Trim to 60% to avoid constant re-trimming
-19: type LogSource = "browserConsole" | "networkRequests" | "sessionReplay";
+type LogSource = "browserConsole" | "networkRequests" | "sessionReplay";
           map: null,
-21: function ensureLogDir() {
+function ensureLogDir() {
       }
 if (!fs.existsSync(LOG_DIR)) {
 fs.mkdirSync(LOG_DIR, { recursive: true });
 }
 }
-27: function trimLogFile(logPath: string, maxSize: number) {
+function trimLogFile(logPath: string, maxSize: number) {
 export default defineConfig({
 try {
 if (!fs.existsSync(logPath) || fs.statSync(logPath).size <= maxSize) {
 return;
 }
-33:     const lines = fs.readFileSync(logPath, "utf-8").split("\n");
+const lines = fs.readFileSync(logPath, "utf-8").split("\n");
       "@": path.resolve(import.meta.dirname, "client", "src"),
 const keptLines: string[] = [];
 let keptBytes = 0;
-37:     // Keep newest lines (from end) that fit within 60% of maxSize
+// Keep newest lines (from end) that fit within 60% of maxSize
   },
 const targetSize = TRIM_TARGET_BYTES;
 for (let i = lines.length - 1; i >= 0; i--) {
@@ -42,19 +42,19 @@ if (keptBytes + lineBytes > targetSize) break;
 keptLines.unshift(lines[i]);
 keptBytes += lineBytes;
 }
-46:     fs.writeFileSync(logPath, keptLines.join("\n"), "utf-8");
+fs.writeFileSync(logPath, keptLines.join("\n"), "utf-8");
     },
 } catch {
 /* ignore trim errors */
 }
 }
-52: function writeToLogFile(source: LogSource, entries: unknown[]) {
+function writeToLogFile(source: LogSource, entries: unknown[]) {
       strict: true,
 if (entries.length === 0) return;
-55:   ensureLogDir();
+ensureLogDir();
   },
 const logPath = path.join(LOG_DIR, `${source}.log`);
-58:   // Format entries with timestamps
+// Format entries with timestamps
 
 const lines = entries.map((entry) => {
 const ts = new Date().toISOString();
@@ -149,7 +149,7 @@ const ts = new Date().toISOString();
 
 };
 }
-153: const plugins = [
+const plugins = [
 
 react({ jsxRuntime: "automatic", dev: false }),
 tailwindcss(),
@@ -177,7 +177,7 @@ return undefined;
 },
 },
 ];
-181: export default defineConfig({
+export default defineConfig({
 
 mode: "production",
 plugins,

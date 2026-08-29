@@ -1,120 +1,111 @@
 import { and, desc, eq, gt, gte, lte, inArray, lt, sql } from "drizzle-orm";
-import type { SQL } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, products, categories, orders, gallery, pageviews, siteContent, coupons, orderNotifications, productReviews, adminCredentials, adminSessions, adminLoginAttempts, siteSettings, restockAlerts, contactInbox } from "../drizzle/schema";
-import type { InsertProduct, InsertCategory, InsertOrder, InsertGalleryItem, InsertPageview, InsertCoupon, InsertOrderNotification, InsertProductReview, InsertAdminCredential, InsertAdminSession, InsertSiteSetting } from "../drizzle/schema";
-import { ENV } from './_core/env';
-8: let _db: ReturnType<typeof drizzle> | null = null;
+import {
+  users,
+  products,
+  categories,
+  orders,
+  gallery,
+  pageviews,
+  siteContent,
+  coupons,
+  orderNotifications,
+  productReviews,
+  adminCredentials,
+  adminSessions,
+  adminLoginAttempts,
+  siteSettings,
+  restockAlerts,
+  contactInbox,
+} from "../drizzle/schema";
+import type {
+  User,
+  InsertUser,
+  Product,
+  InsertProduct,
+  Category,
+  InsertCategory,
+  Order,
+  InsertOrder,
+  GalleryItem,
+  InsertGalleryItem,
+  Pageview,
+  InsertPageview,
+  Coupon,
+  InsertCoupon,
+  OrderNotification,
+  InsertOrderNotification,
+  ProductReview,
+  InsertProductReview,
+  AdminCredential,
+  InsertAdminCredential,
+  AdminSession,
+  InsertAdminSession,
+  SiteSetting,
+  InsertSiteSetting,
+} from "../drizzle/schema";
 
-10: // Lazily create the drizzle instance so local tooling can run without a DB.
+let _db: any = null;
 
 export async function getDb() {
-if (!_db && process.env.DATABASE_URL) {
-try {
-_db = drizzle(process.env.DATABASE_URL);
-} catch (error) {
-console.warn("[Database] Failed to connect:", error);
-_db = null;
+  if (!_db && process.env.DATABASE_URL) {
+    try {
+      _db = drizzle(process.env.DATABASE_URL);
+    } catch (error) {
+      console.warn("[Database] Connection notice:", error);
+      _db = null;
+    }
+  }
+  return _db;
 }
-}
-return _db;
-}
-23: export async function upsertUser(user: InsertUser): Promise<void> {
 
-if (!user.openId) {
-throw new Error("User openId is required for upsert");
-}
-28:   const db = await getDb();
-
-if (!db) {
-console.warn("[Database] Cannot upsert user: database not available");
-return;
-}
-34:   try {
-
-const values: InsertUser = {
-openId: user.openId,
-};
-c
-40:     const textFields = ["name", "email", "loginMethod"] as const;
-
-type TextField = (typeof textFields)[number];
-43:     const assignNullable = (field: TextField) => {
-
-const value = user[field];
-if (value === undefined) return;
-const normalized = value ?? null;
-values[field] = normalized;
-updateSet[field] = normalized;
-};
-51:     textFields.forEach(assignNullable);
-
-53:     if (user.lastSignedIn !== undefined) {
-
-values.lastSignedIn = user.lastSignedIn;
-updateSet.lastSignedIn = user.lastSignedIn;
-}
-if (user.role !== undefined) {
-values.role = user.role;
-updateSet.role = user.role;
-} else if (user.openId === ENV.ownerOpenId) {
-values.role = 'admin';
-updateSet.role = 'admin';
-}
-65:     if (!values.lastSignedIn) {
-
-values.lastSignedIn = new Date();
-}
-69:     if (Object.keys(updateSet).length === 0) {
-
-updateSet.lastSignedIn = new Date();
-}
-73:     await db.insert(users).values(values).onDuplicateKeyUpdate({
-
-set: updateSet,
-});
-} catch (error) {
-console.error("[Database] Failed to upsert user:", error);
-throw error;
-}
-}
-82: export async function getUserByOpenId(openId: string) {
-
-const db = await getDb();
-if (!db) {
-console.warn("[Database] Cannot get user: database not available");
-return undefined;
-}
-89:   const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
-
-91:   return result.length > 0 ? result[0] : undefined;
-
-}
-94: // ===== PHONE-BASED ADMIN LOGIN =====
-
-96: /**
-
-* Normalize a phone number to digits only so formatting (leading zero,
-* spaces, dashes) never breaks login matching.
-*/
 export function normalizePhone(phone: string): string {
-return (phone || "").replace(/[^0-9]/g, "");
+  return (phone || "").replace(/[^0-9]/g, "");
 }
-104: export async function getAdminCredentialByPhone(phone: string) {
 
-const db = await getDb();
-if (!db) {
-console.warn("[Database] Cannot get admin credential: database not available");
-return undefined;
+export async function getUserByOpenId(openId: string): Promise<User | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  try {
+    const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+    return result[0];
+  } catch {
+    return undefined;
+  }
 }
-const result = await db
-.select()
-.from(adminCredentials)
-.where(eq(adminCredentials.phone, normalizePhone(phone)))
-.limit(1);
-return result.length > 0 ? result[0] : undefined;
+
+export async function upsertUser(user: InsertUser): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  try {
+    await db.insert(users).values(user).onDuplicateKeyUpdate({
+      set: {
+        name: user.name ?? undefined,
+        email: user.email ?? undefined,
+        phone: user.phone ?? undefined,
+        lastSignedIn: new Date(),
+      },
+    });
+  } catch (e) {
+    console.error("upsertUser error:", e);
+  }
 }
-118: export async function upsertAdminCredential(data: InsertAdminCredential) {
+
+export async function getAdminCredentialByPhone(phone: string): Promise<AdminCredential | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  try {
+    const result = await db
+      .select()
+      .from(adminCredentials)
+      .where(eq(adminCredentials.phone, normalizePhone(phone)))
+      .limit(1);
+    return result[0];
+  } catch {
+    return undefined;
+  }
+}
+
 export async function upsertAdminCredential(data: InsertAdminCredential) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
@@ -130,91 +121,79 @@ export async function upsertAdminCredential(data: InsertAdminCredential) {
   return getAdminCredentialByPhone(normalized.phone);
 }
 
-const db = await getDb();
-if (!db) throw new Error("Database not available");
-await db.update(adminCredentials).set({ isActive: "no" }).where(eq(adminCredentials.phone, normalizePhone(phone)));
+export async function createAdminSession(data: InsertAdminSession) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.insert(adminSessions).values(data);
+  return data.jti;
 }
-138: export async function createAdminSession(data: InsertAdminSession) {
 
-const db = await getDb();
-if (!db) throw new Error("Database not available");
-await db.insert(adminSessions).values(data);
-return data.jti;
+export async function getActiveAdminSession(jti: string, now: Date): Promise<AdminSession | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  try {
+    const result = await db
+      .select()
+      .from(adminSessions)
+      .where(and(eq(adminSessions.jti, jti), gt(adminSessions.expiresAt, now)))
+      .limit(1);
+    return result[0];
+  } catch {
+    return undefined;
+  }
 }
-145: export async function getActiveAdminSession(jti: string, now: Date) {
 
-const db = await getDb();
-if (!db) {
-console.warn("[Database] Cannot get admin session: database not available");
-return undefined;
+export async function deleteAdminSession(jti: string) {
+  const db = await getDb();
+  if (!db) return;
+  try {
+    await db.delete(adminSessions).where(eq(adminSessions.jti, jti));
+  } catch {}
 }
-const result = await db
-.select()
-.from(adminSessions)
-.where(and(eq(adminSessions.jti, jti), gt(adminSessions.expiresAt, now)))
-.limit(1);
-return result.length > 0 ? result[0] : undefined;
-}
-159: export async function deleteAdminSession(jti: string) {
 
-const db = await getDb();
-if (!db) return;
-await db.delete(adminSessions).where(eq(adminSessions.jti, jti));
+export async function deleteAdminSessionsByPhone(phone: string) {
+  const db = await getDb();
+  if (!db) return;
+  try {
+    await db.delete(adminSessions).where(eq(adminSessions.adminPhone, normalizePhone(phone)));
+  } catch {}
 }
-165: export async function deleteAdminSessionsByPhone(phone: string) {
 
-const db = await getDb();
-if (!db) return;
-await db.delete(adminSessions).where(eq(adminSessions.adminPhone, normalizePhone(phone)));
+export async function recordFailedAdminLogin(ip: string, phone: string) {
+  const db = await getDb();
+  if (!db) return;
+  try {
+    await db.insert(adminLoginAttempts).values({ ip, phone: normalizePhone(phone) });
+  } catch {}
 }
-171: export async function recordFailedAdminLogin(ip: string, phone: string) {
 
-const db = await getDb();
-if (!db) return;
-await db.insert(adminLoginAttempts).values({ ip, phone: normalizePhone(phone) });
+export async function countRecentFailedAdminAttempts(ip: string, windowMs: number): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  try {
+    const since = new Date(Date.now() - windowMs);
+    const result = await db
+      .select()
+      .from(adminLoginAttempts)
+      .where(and(eq(adminLoginAttempts.ip, ip), gt(adminLoginAttempts.createdAt, since)));
+    return result.length;
+  } catch {
+    return 0;
+  }
 }
-177: export async function countRecentFailedAdminAttempts(ip: string, windowMs: number) {
 
-const db = await getDb();
-if (!db) return 0;
-const since = new Date(Date.now() - windowMs);
-const result = await db
-.select()
-.from(adminLoginAttempts)
-.where(and(eq(adminLoginAttempts.ip, ip), gt(adminLoginAttempts.createdAt, since)));
-return result.length;
+export async function getAllAdminCredentials(): Promise<AdminCredential[]> {
+  const db = await getDb();
+  if (!db) return [];
+  try {
+    return await db.select().from(adminCredentials).orderBy(desc(adminCredentials.createdAt));
+  } catch {
+    return [];
+  }
 }
-188: export async function getAllAdminCredentials() {
 
-const db = await getDb();
-if (!db) {
-console.warn("[Database] Cannot list admin credentials: database not available");
-return [];
+export async function deleteAdminCredential(phone: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(adminCredentials).where(eq(adminCredentials.phone, normalizePhone(phone)));
 }
-return db.select().from(adminCredentials).orderBy(desc(adminCredentials.createdAt));
-}
-197: export async function deleteAdminCredential(phone: string) {
-
-const db = await getDb();
-if (!db) throw new Error("Database not available");
-const normalized = normalizePhone(phone);
-await db.delete(adminSessions).where(eq(adminSessions.adminPhone, normalized));
-await db.delete(adminCredentials).where(eq(adminCredentials.phone, normalized));
-}
-205: export async function activateAdminCredential(phone: string) {
-
-const db = await getDb();
-if (!db) throw new Error("Database not available");
-await db.update(adminCredentials).set({ isActive: "yes" }).where(eq(adminCredentials.phone, normalizePhone(phone)));
-}
-211: // ===== SITE SETTINGS =====
-
-213: export async function getSetting(key: string) {
-
-const db = await getDb();
-if (!db) {
-console.warn("[Database] Cannot get setting: database not available");
-return undefined;
-}
-const result = await db.select().from(siteSettings).where(eq(siteSettings.settingKey, key)).limit(1);
-return result.length > 0 ? result[0] : undefined;
