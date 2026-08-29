@@ -1,0 +1,90 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --background: 40 33% 98%;
+    --foreground: 30 11% 13%;
+    --card: 0 0% 100%;
+    --card-foreground: 30 11% 13%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 30 11% 13%;
+    --primary: 42 61% 59%;
+    --primary-foreground: 30 11% 13%;
+    --secondary: 40 20% 94%;
+    --secondary-foreground: 30 11% 13%;
+    --muted: 40 15% 92%;
+    --muted-foreground: 30 8% 45%;
+    --accent: 42 61% 59%;
+    --accent-foreground: 30 11% 13%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 38 18% 86%;
+    --input: 38 18% 86%;
+    --ring: 42 61% 59%;
+    --radius: 0.75rem;
+    --sidebar-background: 30 11% 13%;
+    --sidebar-foreground: 40 33% 98%;
+    --sidebar-primary: 42 61% 59%;
+    --sidebar-primary-foreground: 30 11% 13%;
+    --sidebar-accent: 30 11% 20%;
+    --sidebar-accent-foreground: 40 33% 98%;
+    --sidebar-border: 30 11% 22%;
+    --sidebar-ring: 42 61% 59%;
+  }
+
+  .dark {
+    --background: 30 11% 10%;
+    --foreground: 40 33% 98%;
+    --card: 30 11% 13%;
+    --card-foreground: 40 33% 98%;
+    --popover: 30 11% 13%;
+    --popover-foreground: 40 33% 98%;
+    --primary: 42 61% 59%;
+    --primary-foreground: 30 11% 13%;
+    --secondary: 30 11% 20%;
+    --secondary-foreground: 40 33% 98%;
+    --muted: 30 11% 20%;
+    --muted-foreground: 40 10% 70%;
+    --accent: 42 61% 59%;
+    --accent-foreground: 30 11% 13%;
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 30 11% 22%;
+    --input: 30 11% 22%;
+    --ring: 42 61% 59%;
+  }
+
+  * {
+    border-color: var(--border);
+  }
+
+  body {
+    font-family: 'Cairo', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  }
+}
+
+.gold-gradient {
+  background: linear-gradient(135deg, #d5af58 0%, #f3dd9b 50%, #b88d30 100%);
+}
+
+.gold-text-gradient {
+  background: linear-gradient(135deg, #d5af58 0%, #f3dd9b 50%, #b88d30 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.dark-gradient {
+  background: linear-gradient(145deg, #24211d 0%, #171512 100%);
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(213, 175, 88, 0.2);
+}
+
+.glass-card-dark {
+  background: rgba(36, 33, 29, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(213, 175, 88, 0.25);
+}
