@@ -1,6 +1,5 @@
 {
   "version": 2,
-  "buildCommand": "pnpm build",
   "outputDirectory": "dist/public",
   "rewrites": [
     {
@@ -12,7 +11,7 @@
       "destination": "/api"
     },
     {
-      "source": "/((?!api|assets|favicon|robots\\.txt|sitemap\\.xml).*)",
+      "source": "/((?!api|assets|images|favicon|robots\\.txt|sitemap\\.xml).*)",
       "destination": "/index.html"
     }
   ]
