@@ -84,15 +84,16 @@ export default function DashboardLayout({
             </p>
           </div>
           <Button
-            onClick={() => startLogin()}
+            onClick={() => setLocation("/admin-login")}
             size="lg"
-            className="w-full shadow-lg hover:shadow-xl transition-all"
+            className="w-full bg-[#24211d] text-white hover:bg-[#ad842f] shadow-lg hover:shadow-xl transition-all"
           >
-            تسجيل الدخول
+            تسجيل الدخول إلى لوحة التحكم
           </Button>
         </div>
       </div>
     );
+
   }
   if (user.role !== "admin") {
     return (

@@ -604,8 +604,9 @@ export default function ProductDetail() {
               })}</div>
             </div> : null}
 
-            {colors.length ? <div className="space-y-3 rounded-2xl border border-[#e3dbc9] bg-[#fcfbf7] p-4">
+            {(colors.length > 0 || colorOptions.length > 0) ? <div className="space-y-3 rounded-2xl border border-[#e3dbc9] bg-[#fcfbf7] p-4">
               <div className="flex items-center gap-2"><Palette className="h-4 w-4 text-[#ad842f]" /><h3 className="font-bold">{lang === "ar" ? "اختر اللون" : "Choose your colour"}</h3><span className="text-xs text-[#8a806f]">{lang === "ar" ? "مطلوب" : "Required"}</span></div>
+
               <div className="flex flex-wrap gap-2">{colorOptions.length ? colorOptions.map((opt) => {
                 const label = lang === "ar" ? opt.labelAr : opt.labelEn;
                 return <button type="button" key={opt.labelAr} onClick={() => setSelectedColor(opt.labelAr)} aria-pressed={selectedColor === opt.labelAr} className={`inline-flex min-h-11 items-center gap-2 rounded-xl border px-4 text-sm font-bold transition ${selectedColor === opt.labelAr ? "border-[#ad842f] bg-[#24211d] text-white shadow-sm" : "border-[#d9d1c0] bg-white text-[#3d382f] hover:border-[#ad842f]"}`}><span className="h-4 w-4 rounded-full border border-black/15" style={{ backgroundColor: opt.hex }} />{selectedColor === opt.labelAr ? <Check className="h-3.5 w-3.5" /> : null}{label}</button>;
