@@ -1,111 +1,160 @@
-import React, { useState, useEffect } from "react";
-import DashboardLayout from "@/components/DashboardLayout";
+import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Save, Phone, Mail, MapPin, DollarSign, Loader2 } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Loader2, Save, Facebook, Instagram, Send, MessageCircle, Phone } from "lucide-react";
 import { toast } from "sonner";
 
 export default function AdminSettings() {
-  const { data: settings, isLoading, refetch } = trpc.settings.list.useQuery();
-
-  const [form, setForm] = useState({
-    siteName: "Elnour Homes",
-    businessPhone: "01121748885",
-    notificationEmail: "ahmadhashemalam964@gmail.com",
-    globalMeterPrice: 3500,
-    address: "جمهورية مصر العربية - التوصيل لكافة المحافظات",
+  const utils = trpc.useUtils();
+  const { data: contact, isLoading } = trpc.contactInfo.get.useQuery();
+  const updateMutation = trpc.contactInfo.update.useMutation({
+    onSuccess: () => {
+      utils.contactInfo.get.invalidate();
+      toast.success("تم حفظ إعدادات التواصل");
+    },
+    onError: (error) => toast.error("فشل الحفظ: " + error.message),
   });
+
+  const [facebookUrl, setFacebookUrl] = useState("");
+  const [instagramUrl, setInstagramUrl] = useState("");
+  const [telegramUrl, setTelegramUrl] = useState("");
+  const [whatsappNumber, setWhatsappNumber] = useState("");
+  const [whatsAppMessage, setWhatsAppMessage] = useState("");
+  const [phone, setPhone] = useState("");
 
   useEffect(() => {
-    if (settings) {
-      const sMap: Record<string, string> = {};
-      settings.forEach((item: any) => {
-        sMap[item.key] = item.value;
-      });
-      setForm((prev) => ({
-        ...prev,
-        siteName: sMap["site_name"] || prev.siteName,
-        businessPhone: sMap["business_phone"] || prev.businessPhone,
-        notificationEmail: sMap["notification_email"] || prev.notificationEmail,
-        globalMeterPrice: sMap["global_meter_price"] ? Number(sMap["global_meter_price"]) : prev.globalMeterPrice,
-        address: sMap["address"] || prev.address,
-      }));
+    if (contact) {
+      setFacebookUrl(contact.facebookUrl);
+      setInstagramUrl(contact.instagramUrl);
+      setTelegramUrl(contact.telegramUrl);
+      setWhatsappNumber(contact.whatsappNumber);
+      setWhatsAppMessage(contact.whatsAppMessage);
+      setPhone(contact.phone);
     }
-  }, [settings]);
+  }, [contact]);
 
-  const updateSetting = trpc.settings.update.useMutation({
-    onSuccess: () => {
-      toast.success("تم حفظ وتحديث الإعدادات بنجاح");
-      void refetch();
-    },
-    onError: (e) => toast.error(e.message),
-  });
-
-  const handleSave = (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    updateSetting.mutate({
-      settings: [
-        { key: "site_name", value: form.siteName },
-        { key: "business_phone", value: form.businessPhone },
-        { key: "notification_email", value: form.notificationEmail },
-        { key: "global_meter_price", value: String(form.globalMeterPrice) },
-        { key: "address", value: form.address },
-      ],
+    updateMutation.mutate({
+      facebookUrl,
+      instagramUrl,
+      telegramUrl,
+      whatsappNumber,
+      whatsAppMessage,
+      phone,
     });
   };
 
-  return (
-    <DashboardLayout>
-      <div className="space-y-6 max-w-4xl">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#24211d]">إعدادات المتجر العامة</h1>
-          <p className="text-sm text-muted-foreground mt-1">تحديد رقم التواصل الموحد، سعر المتر الأساسي، وبيانات الإشعارات.</p>
-        </div>
-
-        <form onSubmit={handleSave} className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>بيانات التواصل والمتجر</CardTitle>
-              <CardDescription>البيانات التي تظهر للعملاء في الهيدر والفوتر ورسائل الواتساب.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-bold block mb-1.5">اسم المتجر / البراند</label>
-                  <Input value={form.siteName} onChange={(e) => setForm({ ...form, siteName: e.target.value })} required />
-                </div>
-                <div>
-                  <label className="text-xs font-bold block mb-1.5">رقم الهاتف والواتساب الموحد *</label>
-                  <Input dir="ltr" value={form.businessPhone} onChange={(e) => setForm({ ...form, businessPhone: e.target.value })} required />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-bold block mb-1.5">بريد استلام إشعارات الطلبات *</label>
-                  <Input dir="ltr" value={form.notificationEmail} onChange={(e) => setForm({ ...form, notificationEmail: e.target.value })} required />
-                </div>
-                <div>
-                  <label className="text-xs font-bold block mb-1.5">السعر الافتراضي للمتر المربع (ج.م)</label>
-                  <Input type="number" value={form.globalMeterPrice} onChange={(e) => setForm({ ...form, globalMeterPrice: Number(e.target.value) })} required />
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold block mb-1.5">العنوان ومناطق التغطية</label>
-                <Input value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Button type="submit" disabled={updateSetting.isPending} className="bg-[#24211d] text-white hover:bg-[#d5af58] hover:text-[#24211d] font-bold px-8 h-12 rounded-xl">
-            <Save className="ml-2 h-4 w-4" />
-            {updateSetting.isPending ? "جاري الحفظ..." : "حفظ التغييرات"}
-          </Button>
-        </form>
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
-    </DashboardLayout>
+    );
+  }
+
+  return (
+    <div className="space-y-6 max-w-2xl">
+      <div>
+        <h1 className="text-2xl font-bold flex items-center gap-2">
+          إعدادات التواصل ووسائل التواصل
+        </h1>
+        <p className="text-muted-foreground mt-1">
+          عدّل روابط فيسبوك والواتساب وأرقام التواصل. التغييرات تظهر على الموقع فوراً.
+        </p>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>روابط التواصل</CardTitle>
+          <CardDescription>
+            أضف رابط صفحة فيسبوك ليظهر في الشريط العلوي والتذييل والزر العائم.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Facebook className="h-4 w-4 text-blue-600" />
+                رابط صفحة فيسبوك
+              </Label>
+              <Input
+                value={facebookUrl}
+                onChange={(e) => setFacebookUrl(e.target.value)}
+                placeholder="https://www.facebook.com/..."
+                dir="ltr"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Instagram className="h-4 w-4 text-pink-600" />
+                رابط إنستجرام (اختياري)
+              </Label>
+              <Input
+                value={instagramUrl}
+                onChange={(e) => setInstagramUrl(e.target.value)}
+                placeholder="https://www.instagram.com/..."
+                dir="ltr"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Send className="h-4 w-4 text-sky-500" />
+                رابط تليجرام (اختياري)
+              </Label>
+              <Input
+                value={telegramUrl}
+                onChange={(e) => setTelegramUrl(e.target.value)}
+                placeholder="https://t.me/..."
+                dir="ltr"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <MessageCircle className="h-4 w-4 text-green-600" />
+                رقم الواتساب (واتساب أعمال)
+              </Label>
+              <Input
+                value={whatsappNumber}
+                onChange={(e) => setWhatsappNumber(e.target.value)}
+                placeholder="01118182424"
+                dir="ltr"
+              />
+              <p className="text-xs text-muted-foreground">اكتب الرقم بصيغة 0XXXXXXXXXX</p>
+            </div>
+            <div className="space-y-2">
+              <Label>الرسالة الافتراضية في واتساب (اختياري)</Label>
+              <Textarea
+                value={whatsAppMessage}
+                onChange={(e) => setWhatsAppMessage(e.target.value)}
+                placeholder="مرحباً، أود الاستفسار عن منتجاتكم..."
+                rows={3}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Phone className="h-4 w-4" />
+                رقم الهاتف (اختياري)
+              </Label>
+              <Input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="01118182424"
+                dir="ltr"
+              />
+            </div>
+            <Button type="submit" disabled={updateMutation.isPending} className="gap-2">
+              {updateMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              <Save className="h-4 w-4" />
+              حفظ الإعدادات
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

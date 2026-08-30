@@ -7,3 +7,6 @@ dist
 uploads/*
 !uploads/.gitkeep
 .vercel
+elnour-steel-extracted
+elnour-steel.zip
+

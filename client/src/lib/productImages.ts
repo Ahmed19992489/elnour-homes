@@ -1,22 +1,32 @@
-export function parseProductImages(raw?: string | string[] | null): string[] {
-  if (!raw) return [];
-  if (Array.isArray(raw)) return raw;
+/**
+ * Product images are stored as a comma-separated list for compatibility with
+ * existing records. This utility also accepts JSON arrays imported from older
+ * catalogue tools, and treats both relative S3 paths and full URLs as valid.
+ */
+export function parseProductImages(images: string | null | undefined): string[] {
+  if (!images?.trim()) return [];
+
+  const value = images.trim();
   try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [raw];
+    const parsed: unknown = JSON.parse(value);
+    if (Array.isArray(parsed)) {
+      return parsed.filter((item): item is string => typeof item === "string" && Boolean(item.trim())).map((item) => item.trim());
+    }
   } catch {
-    return raw
-      .split("\n")
-      .map((s) => s.trim())
-      .filter(Boolean);
+    // Existing records use comma-separated URLs; parse them below.
   }
+
+  return value.split(",").map((image) => image.trim()).filter(Boolean);
+}
+
+export function getPrimaryProductImage(images: string | null | undefined): string | undefined {
+  return parseProductImages(images)[0];
+}
+
+export function hasProductImage(images: string | null | undefined): boolean {
+  return parseProductImages(images).length > 0;
 }
 
 export function serializeProductImages(images: string[]): string {
-  return JSON.stringify(images);
-}
-
-export function hasProductImage(product: { images?: string | string[] | null }): boolean {
-  const images = parseProductImages(product.images);
-  return images.length > 0 && !!images[0];
+  return images.map((image) => image.trim()).filter(Boolean).join(", ");
 }

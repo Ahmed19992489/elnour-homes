@@ -1,145 +1,28 @@
-import React, { useState } from "react";
 import PublicLayout from "@/components/storefront/PublicLayout";
-import { trpc } from "@/lib/trpc";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { UpdateHead } from "@/components/UpdateHead";
-import { Sparkles, MessageCircle, Eye, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
-
-const BUSINESS_PHONE = "01121748885";
+import { trpc } from "@/lib/trpc";
+import { Images, Loader2 } from "lucide-react";
 
 export default function WorkPage() {
-  const { lang, t } = useLanguage();
+  const { lang } = useLanguage();
   UpdateHead({
-    title: lang === "ar" ? "معرض أعمالنا ومشاريع الاستيل | Elnour Homes" : "Our Portfolio & Steel Work | Elnour Homes",
-    description: "استعرض سابقة أعمال ومشاريع Elnour Homes المنفذة من ديكورات الاستيل الفاخرة وتشطيبات الفلل والمنازل العصرية.",
+    title: lang === "ar" ? "أعمالنا | Elnour for STEEL - ديكورات استيل" : "Our Work | Elnour for STEEL - Steel Decor",
+    description: lang === "ar" ? "نماذج من أعمال Elnour for STEEL المنفذة: ديكورات استيل مطلى بفواصل وطرابيزات ومسابح إضاءة." : "Examples of completed Elnour for STEEL work: electrostatic-coated steel décor, dividers, tables and light channels.",
+    path: lang === "ar" ? "/work?lang=ar" : "/work?lang=en",
   });
+  const { data: gallery, isLoading } = trpc.gallery.list.useQuery();
+  const copy = lang === "ar" ? {
+    eyebrow: "أعمالنا", title: "مشاريع نفذناها بعناية", description: "تصفح نماذج من الأعمال المنفذة لتتعرف على أسلوب التشطيب والتفاصيل.", empty: "سنضيف نماذج الأعمال المنفذة قريباً.",
+  } : {
+    eyebrow: "OUR WORK", title: "Projects crafted with care", description: "Browse selected completed work to see our finishing style and attention to detail.", empty: "Completed project examples will be added soon.",
+  };
 
-  const { data: rawGallery, isLoading } = trpc.gallery.list.useQuery();
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
-
-  const defaultItems = [
-    {
-      id: 1,
-      title: "ترابيزة صالون استيل 304 ذهبي",
-      category: "ترابيزات",
-      imageUrl: "https://images.unsplash.com/photo-1533090161767-e6ffed986b88?w=800&auto=format&fit=crop&q=80",
-    },
-    {
-      id: 2,
-      title: "كونسول مدخل استيل مودرن مع رخام",
-      category: "كونسول",
-      imageUrl: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?w=800&auto=format&fit=crop&q=80",
-    },
-    {
-      id: 3,
-      title: "مراية مضيئة بإطار استيل ليزر",
-      category: "مرايات",
-      imageUrl: "https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?w=800&auto=format&fit=crop&q=80",
-    },
-    {
-      id: 4,
-      title: "قاطع جداري بارتشن استيل ذهبي مطفي",
-      category: "قواطع",
-      imageUrl: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&auto=format&fit=crop&q=80",
-    },
-    {
-      id: 5,
-      title: "طقم ترابيزات متداخلة ركنة استيل",
-      category: "ترابيزات",
-      imageUrl: "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=800&auto=format&fit=crop&q=80",
-    },
-    {
-      id: 6,
-      title: "ديكور جداري استانلس ليزر بتصميم هندسي",
-      category: "ديكورات",
-      imageUrl: "https://images.unsplash.com/photo-1618219908412-a29a1bb7b86e?w=800&auto=format&fit=crop&q=80",
-    },
-  ];
-
-  const galleryItems = Array.isArray(rawGallery) ? rawGallery : [];
-  const items = galleryItems.length > 0 ? galleryItems : defaultItems;
-
-  return (
-    <PublicLayout>
-      {/* Header Banner */}
-      <section className="border-b border-[#e8e2d8] bg-[#f5f0e6] py-12 md:py-16">
-        <div className="container mx-auto px-4 text-center">
-          <div className="mx-auto inline-flex items-center gap-2 rounded-full bg-[#d5af58]/20 px-4 py-1.5 text-xs font-bold text-[#a8822d] mb-4">
-            <Sparkles className="h-3.5 w-3.5" />
-            <span>{t("سابقة أعمالنا الواقعية", "Our Real Project Portfolio")}</span>
-          </div>
-          <h1 className="text-3xl md:text-5xl font-black text-[#24211d]">
-            {t("معرض مشاريع وأعمال الاستيل", "Executed Steel Projects")}
-          </h1>
-          <p className="mt-3 text-base text-[#6b6255] max-w-2xl mx-auto">
-            {t(
-              "نماذج حية من أعمالنا في تصنيع وتركيب أثاث وديكورات الاستيل لعملائنا في مختلف محافظات مصر.",
-              "Live examples of our manufactured stainless steel decor and furniture for clients across Egypt."
-            )}
-          </p>
-        </div>
-      </section>
-
-      {/* Gallery Grid */}
-      <section className="container mx-auto px-4 py-12">
-        {isLoading ? (
-          <div className="flex justify-center py-20">
-            <Loader2 className="h-10 w-10 animate-spin text-[#d5af58]" />
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {items.map((item: any) => (
-              <div
-                key={item.id}
-                className="group relative overflow-hidden rounded-2xl border border-[#e8e2d8] bg-white shadow-xs hover:shadow-xl transition-all duration-300 aspect-4/3"
-              >
-                <img
-                  src={item.imageUrl}
-                  alt={item.title}
-                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-6 text-white">
-                  <span className="text-xs font-bold text-[#d5af58]">{item.category}</span>
-                  <h3 className="text-lg font-bold">{item.title}</h3>
-                  <div className="mt-3 flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      onClick={() => setSelectedImage(item.imageUrl)}
-                      className="bg-white/20 hover:bg-white/30 backdrop-blur-md text-white text-xs h-8 rounded-lg cursor-pointer"
-                    >
-                      <Eye className="h-3.5 w-3.5 ml-1" />
-                      {t("تكبير الصورة", "View Full")}
-                    </Button>
-                    <a
-                      href={`https://wa.me/20${BUSINESS_PHONE.slice(1)}?text=${encodeURIComponent(`مرحباً، أود الاستفسار عن تفصيل عمل مماثل لـ: ${item.title}`)}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <Button size="sm" className="bg-[#d5af58] text-[#24211d] hover:bg-[#e0be6c] text-xs h-8 font-bold rounded-lg cursor-pointer">
-                        <MessageCircle className="h-3.5 w-3.5 ml-1 text-emerald-700" />
-                        {t("اطلب مثله", "Order Similar")}
-                      </Button>
-                    </a>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* Image Preview Modal */}
-      {selectedImage && (
-        <Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
-          <DialogContent className="max-w-4xl p-2 bg-black/90 border-neutral-800">
-            <div className="relative rounded-lg overflow-hidden flex items-center justify-center">
-              <img src={selectedImage} alt="Preview" className="max-h-[85vh] w-auto object-contain rounded" />
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
-    </PublicLayout>
-  );
+  return <PublicLayout>
+    <section className="bg-[#eee9df] px-4 py-16 md:py-24"><div className="container max-w-4xl text-center"><p className="text-sm font-bold tracking-[0.18em] text-[#a17a26]">{copy.eyebrow}</p><h1 className="mt-4 text-4xl font-black text-[#24211d] md:text-6xl">{copy.title}</h1><p className="mx-auto mt-5 max-w-2xl text-lg leading-8 text-[#5d574d]">{copy.description}</p></div></section>
+    <section className="container py-14 md:py-20">
+      {isLoading ? <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-[#ad842f]" /></div> : gallery?.length ? <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">{gallery.map((item) => <figure key={item.id} className="group overflow-hidden rounded-2xl bg-[#24211d] shadow-sm"><div className="aspect-[4/3] overflow-hidden"><img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" /></div><figcaption className="p-4 text-sm font-bold text-white">{item.title}</figcaption></figure>)}</div> : <div className="rounded-2xl border border-dashed border-[#c8beae] bg-white px-6 py-20 text-center"><Images className="mx-auto h-10 w-10 text-[#ad842f]" /><p className="mt-4 text-[#5d574d]">{copy.empty}</p></div>}
+    </section>
+  </PublicLayout>;
 }
+

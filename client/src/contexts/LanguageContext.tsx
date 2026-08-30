@@ -1,46 +1,54 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
-
-type Language = "ar" | "en";
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from "react";
+import { translations, Language, TranslationKey } from "@/i18n/translations";
 
 type LanguageContextType = {
   lang: Language;
+  t: (key: TranslationKey) => string;
   setLang: (lang: Language) => void;
   isRTL: boolean;
-  t: (arText: string, enText: string) => string;
 };
 
-const LanguageContext = createContext<LanguageContextType>({
-  lang: "ar",
-  setLang: () => {},
-  isRTL: true,
-  t: (ar) => ar,
-});
+const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
-export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export function LanguageProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<Language>(() => {
-    const saved = localStorage.getItem("elnour_lang");
-    return saved === "en" ? "en" : "ar";
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("language") as Language | null;
+      if (saved === "ar" || saved === "en") return saved;
+    }
+    return "ar";
   });
 
-  const isRTL = lang === "ar";
-
-  const setLang = (newLang: Language) => {
+  const setLang = useCallback((newLang: Language) => {
     setLangState(newLang);
-    localStorage.setItem("elnour_lang", newLang);
-  };
+    localStorage.setItem("language", newLang);
+    document.documentElement.lang = newLang;
+    document.documentElement.dir = newLang === "ar" ? "rtl" : "ltr";
+  }, []);
 
   useEffect(() => {
-    document.documentElement.dir = isRTL ? "rtl" : "ltr";
     document.documentElement.lang = lang;
-  }, [lang, isRTL]);
+    document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
+  }, [lang]);
 
-  const t = (arText: string, enText: string) => (lang === "ar" ? arText : enText);
+  const t = useCallback(
+    (key: TranslationKey): string => {
+      return translations[lang][key] || translations.ar[key] || key;
+    },
+    [lang]
+  );
 
   return (
-    <LanguageContext.Provider value={{ lang, setLang, isRTL, t }}>
+    <LanguageContext.Provider value={{ lang, t, setLang, isRTL: lang === "ar" }}>
       {children}
     </LanguageContext.Provider>
   );
-};
+}
 
-export const useLanguage = () => useContext(LanguageContext);
+export function useLanguage() {
+  const context = useContext(LanguageContext);
+  if (!context) {
+    throw new Error("useLanguage must be used within a LanguageProvider");
+  }
+  return context;
+}

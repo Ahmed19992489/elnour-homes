@@ -1,308 +1,387 @@
-import React, { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
-import PublicLayout from "@/components/storefront/PublicLayout";
-import { useCart } from "@/contexts/CartContext";
-import { useLanguage } from "@/contexts/LanguageContext";
-import { UpdateHead } from "@/components/UpdateHead";
-import { trpc } from "@/lib/trpc";
-import { formatPrice } from "@/lib/utils";
+import { toast } from "sonner";
+import { Loader2, ShoppingCart, Truck, BadgeCheck, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
-import { toast } from "sonner";
-import { CheckCircle2, ShoppingBag, Truck, MessageCircle, ArrowLeft, ShieldCheck } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { useCart } from "@/contexts/CartContext";
+import { cartTotals } from "@/lib/cart";
+import { trpc } from "@/lib/trpc";
+import PublicLayout from "@/components/storefront/PublicLayout";
 
-const BUSINESS_PHONE = "01121748885";
+function formatPrice(price: number) {
+  return price.toLocaleString("en-US", { maximumFractionDigits: 2 });
+}
 
-const EGYPT_GOVERNORATES = [
-  "القاهرة", "الجيزة", "الإسكندرية", "القليوبية", "الشرقية", "الدقهلية",
-  "البحيرة", "المنوفية", "الغربية", "كفر الشيخ", "دمياط", "بورسعيد",
-  "الإسماعيلية", "السويس", "شمال سيناء", "جنوب سيناء", "البحر الأحمر",
-  "الفيوم", "بني سويف", "المنيا", "أسيوط", "سوهاج", "قنا", "الأقصر", "أسوان", "مطروح", "الوادي الجديد"
-];
+function priceDisplay(price: number, lang: string) {
+  return `${formatPrice(price)} ${lang === "ar" ? "ج.م" : "EGP"}`;
+}
 
 export default function CheckoutPage() {
-  const [, setLocation] = useLocation();
-  const { lang, isRTL, t } = useLanguage();
-  UpdateHead({
-    title: lang === "ar" ? "تأكيد الطلب والدفع | Elnour Homes" : "Checkout | Elnour Homes",
-  });
-
-  const { items, total, subtotal, discount, couponCode, clearCart } = useCart();
+  const { lang, t } = useLanguage();
+  const { items, empty } = useCart();
+  const [, navigate] = useLocation();
+  const [hydrated, setHydrated] = useState(false);
 
   const [form, setForm] = useState({
     customerName: "",
-    phone: "",
-    governorate: "القاهرة",
-    city: "",
-    address: "",
-    notes: "",
+    customerPhone: "",
+    customerEmail: "",
+    customerAddress: "",
+    message: "",
+  });
+  const [emailError, setEmailError] = useState("");
+  const [couponCode, setCouponCode] = useState("");
+  const [couponState, setCouponState] = useState<{
+    valid: boolean | null;
+    discount: number;
+    message: string;
+    checking: boolean;
+  }>({ valid: null, discount: 0, message: "", checking: false });
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
+
+  const productIds = useMemo(
+    () => Array.from(new Set(items.map((i) => i.productId))),
+    [items],
+  );
+
+  const { data: products } = trpc.products.active.useQuery(undefined, {
+    enabled: hydrated && productIds.length > 0,
   });
 
-  const [createdOrderId, setCreatedOrderId] = useState<number | null>(null);
+  const availableItems = useMemo(() => {
+    const map = new Map<number, NonNullable<typeof products>[number]>();
+    (products ?? []).forEach((p) => map.set(p.id, p));
+    return items.filter((i) => map.get(i.productId)?.isActive === "yes");
+  }, [items, products]);
 
-  const createOrder = trpc.orders.create.useMutation({
-    onSuccess: (order) => {
-      setCreatedOrderId(order.id);
-      clearCart();
-      toast.success(lang === "ar" ? "تم تسجيل طلبك بنجاح! سنتواصل معك للتأكيد." : "Order placed successfully!");
+  const { subtotal } = cartTotals(availableItems);
+  const discount = couponState.valid ? couponState.discount : 0;
+  const finalTotal = Math.max(0, subtotal - discount);
+
+  const trackPageview = trpc.pageviews.track.useMutation();
+  useEffect(() => {
+    let sessionId = sessionStorage.getItem("_sessionId");
+    if (!sessionId) {
+      sessionId = crypto.randomUUID();
+      sessionStorage.setItem("_sessionId", sessionId);
+    }
+    trackPageview.mutate({
+      sessionId,
+      path: "/checkout",
+      referrer: document.referrer || undefined,
+      userAgent: navigator.userAgent,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const validateCoupon = trpc.coupons.validate.useMutation({
+    onSuccess: (data) => {
+      const reason = data.valid
+        ? (lang === "ar" ? "الكوبون صحيح" : "Coupon applied")
+        : (lang === "en" ? "This coupon is invalid" : "الكوبون غير صالح");
+      setCouponState({ valid: data.valid, discount: data.discount, message: reason, checking: false });
+      if (!data.valid) toast.error(reason);
+      else toast.success(lang === "en" ? `${reason} — ${data.discount} EGP off` : `${reason} — خصم ${data.discount} ج.م`);
     },
     onError: (err) => {
-      toast.error(err.message || (lang === "ar" ? "حدث خطأ أثناء تسجيل الطلب، يرجى المحاولة مرة أخرى" : "Error placing order"));
+      setCouponState({ valid: false, discount: 0, message: err.message, checking: false });
+      toast.error(err.message);
     },
   });
+
+  const createCartOrder = trpc.orders.createCart.useMutation({
+    onSuccess: (data) => {
+      toast.success(
+        lang === "ar"
+          ? `تم استلام طلبك بنجاح${data.orderId ? ` (رقم الطلب: ${data.orderId})` : ""}. سنتواصل معك قريبًا.`
+          : `Your order was received successfully${data.orderId ? ` (Order #${data.orderId})` : ""}. We'll contact you soon.`,
+      );
+      empty();
+      if (data.orderId) navigate(`/account/orders/${data.orderId}`);
+      else navigate("/account");
+    },
+    onError: (err) => {
+      toast.error(err.message);
+    },
+  });
+
+  const setField = (field: keyof typeof form, value: string) =>
+    setForm((f) => ({ ...f, [field]: value }));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.customerName.trim() || !form.phone.trim() || !form.address.trim()) {
-      toast.error("يرجى إدخال جميع البيانات الإلزامية");
+    setEmailError("");
+    if (!form.customerName.trim()) {
+      toast.error(lang === "ar" ? "يرجى إدخال الاسم" : "Please enter your name");
       return;
     }
-
-    if (items.length === 0) {
-      toast.error("سلة مشترياتك فارغة");
+    if (!/^(01|\+?20|20)?1[0125][0-9]{8}$/.test(form.customerPhone.trim().replace(/\s+/g, ""))) {
+      toast.error(lang === "ar" ? "يرجى إدخال رقم هاتف مصري صحيح يبدأ بـ 01" : "Please enter a valid Egyptian phone number starting with 01");
       return;
     }
-
-    // Build payload
-    createOrder.mutate({
+    if (form.customerEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.customerEmail.trim())) {
+      setEmailError(lang === "ar" ? "يرجى إدخال بريد إلكتروني صحيح" : "Please enter a valid email address");
+      return;
+    }
+    if (availableItems.length === 0) {
+      toast.error(lang === "ar" ? "السلة فارغة أو المنتجات لم تعد متاحة" : "Your cart is empty or the products are no longer available");
+      return;
+    }
+    createCartOrder.mutate({
       customerName: form.customerName.trim(),
-      customerPhone: form.phone.trim(),
-      customerAddress: `${form.governorate} - ${form.city ? form.city + " - " : ""}${form.address.trim()}`,
-      notes: form.notes ? form.notes.trim() : undefined,
-      couponCode: couponCode || undefined,
-      items: items.map((i) => ({
+      customerPhone: form.customerPhone.trim(),
+      customerEmail: form.customerEmail.trim() || undefined,
+      customerAddress: form.customerAddress.trim() || undefined,
+      message: form.message.trim() || undefined,
+      items: availableItems.map((i) => ({
         productId: i.productId,
-        productName: i.nameAr || i.name,
-        price: i.price,
+        selectedSize: i.selectedSize,
+        selectedColor: i.selectedColor,
         quantity: i.quantity,
-        size: i.size,
-        color: i.color,
-        meters: i.meters,
-        isPerMeter: i.isPerMeter ? true : false,
       })),
-      totalAmount: total,
+      couponCode: couponState.valid ? couponCode.trim().toUpperCase() : undefined,
+      orderValue: couponState.valid ? finalTotal : undefined,
+      orderSource: "web",
+      referrer: document.referrer || undefined,
+      userAgent: navigator.userAgent,
     });
   };
 
-  const handleWhatsAppConfirmation = () => {
-    if (!createdOrderId) return;
-    const message = `مرحباً Elnour Homes، لقد قمت بتسجيل طلب جديد رقم #${createdOrderId} باسم ${form.customerName}.\nأرجو تأكيد استلام الطلب وموعد التوصيل. شكراً لكم!`;
-    window.open(`https://wa.me/20${BUSINESS_PHONE.slice(1)}?text=${encodeURIComponent(message)}`, "_blank");
-  };
+  const productById = useMemo(() => {
+    const map = new Map<number, NonNullable<typeof products>[number]>();
+    (products ?? []).forEach((p) => map.set(p.id, p));
+    return map;
+  }, [products]);
 
-  if (createdOrderId) {
+  if (!hydrated || items.length === 0) {
     return (
       <PublicLayout>
-        <section className="container mx-auto px-4 py-16 text-center max-w-xl">
-          <div className="rounded-3xl border border-emerald-200 bg-white p-8 md:p-12 shadow-sm space-y-6">
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-              <CheckCircle2 className="h-12 w-12" />
-            </div>
-
-            <div className="space-y-2">
-              <h1 className="text-2xl md:text-3xl font-black text-[#24211d]">
-                {t("تم استلام وتأكيد طلبك بنجاح!", "Order Received Successfully!")}
-              </h1>
-              <p className="text-sm font-bold text-[#a8822d]">
-                {t(`رقم الطلب: #${createdOrderId}`, `Order Number: #${createdOrderId}`)}
-              </p>
-              <p className="text-sm text-muted-foreground leading-relaxed pt-2">
-                {t(
-                  "شكراً لثقتك في Elnour Homes. سيقوم فريق خدمة العملاء بالتواصل معك هاتفياً أو عبر واتساب لمراجعة المقاسات وموعد التسليم.",
-                  "Thank you for choosing Elnour Homes. Our support team will contact you shortly to review dimensions and delivery schedule."
-                )}
-              </p>
-            </div>
-
-            <div className="pt-4 flex flex-col sm:flex-row gap-3">
-              <Button
-                onClick={handleWhatsAppConfirmation}
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-12 rounded-xl"
-              >
-                <MessageCircle className="ml-2 h-5 w-5" />
-                {t("متابعة الطلب على واتساب", "Follow up on WhatsApp")}
-              </Button>
-
-              <Link href={`/account/orders/${createdOrderId}`} className="flex-1">
-                <Button variant="outline" className="w-full font-bold h-12 rounded-xl border-[#d5af58]">
-                  {t("عرض تفاصيل الفاتورة", "View Invoice")}
-                </Button>
-              </Link>
-            </div>
-          </div>
-        </section>
+        <div className="container max-w-3xl py-12 text-center">
+          <ShoppingCart className="mx-auto h-12 w-12 text-muted-foreground" />
+          <h1 className="mt-4 text-2xl font-bold">
+            {lang === "ar" ? "لا يوجد طلب لإتمامه" : "Nothing to checkout"}
+          </h1>
+          <Button asChild className="mt-6">
+            <Link href="/cart">{lang === "ar" ? "عرض السلة" : "View cart"}</Link>
+          </Button>
+        </div>
       </PublicLayout>
     );
   }
 
+  const unavailable = items.filter((i) => productById.get(i.productId)?.isActive !== "yes");
+
   return (
     <PublicLayout>
-      <section className="container mx-auto px-4 py-12 md:py-16">
-        <h1 className="text-3xl md:text-4xl font-black text-[#24211d] mb-8">
-          {t("إتمام الطلب وتأكيد البيانات", "Checkout & Order Details")}
+      <div className="container max-w-4xl py-10">
+        <h1 className="text-2xl font-bold">
+          {lang === "ar" ? "إتمام الطلب" : "Checkout"}
         </h1>
 
-        {items.length === 0 ? (
-          <div className="rounded-3xl border border-dashed border-[#ddd6c8] bg-white p-12 text-center max-w-md mx-auto">
-            <p className="font-bold text-lg text-[#24211d]">{t("لا توجد منتجات في السلة", "Your cart is empty")}</p>
-            <Link href="/products">
-              <Button className="mt-4 bg-[#24211d] text-white hover:bg-[#a8822d] font-bold">
-                {t("العودة للتسوق", "Back to Shopping")}
-              </Button>
-            </Link>
+        {unavailable.length > 0 && (
+          <div className="mt-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            {lang === "ar"
+              ? "تم استبعاد منتجات غير متاحة من الطلب."
+              : "Unavailable products were excluded from your order."}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mt-1 p-0 text-amber-800 underline"
+              onClick={() => navigate("/cart")}
+            >
+              {lang === "ar" ? "العودة إلى السلة" : "Back to cart"}
+            </Button>
+          </div>
+        )}
+
+        {availableItems.length === 0 ? (
+          <div className="mt-6 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+            {lang === "ar" ? "جميع منتجات سلتك لم تعد متاحة. العودة إلى السلة." : "All items in your cart are no longer available. Back to cart."}
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-            {/* Customer Information Form */}
-            <div className="lg:col-span-2 space-y-6">
-              <div className="rounded-3xl border border-[#e8e2d8] bg-white p-6 md:p-8 shadow-xs space-y-6">
-                <div className="flex items-center gap-3 border-b border-[#eee8dd] pb-4">
-                  <Truck className="h-5 w-5 text-[#a8822d]" />
-                  <h2 className="text-xl font-bold text-[#24211d]">
-                    {t("بيانات العميل والشحن", "Customer & Delivery Details")}
-                  </h2>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-bold text-[#5c5448] block mb-1.5">
-                      {t("الاسم بالكامل *", "Full Name *")}
-                    </label>
-                    <Input
-                      value={form.customerName}
-                      onChange={(e) => setForm({ ...form, customerName: e.target.value })}
-                      placeholder="مثال: أحمد محمد سالم"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-bold text-[#5c5448] block mb-1.5">
-                      {t("رقم الهاتف المحمول (واتساب) *", "Phone / WhatsApp *")}
-                    </label>
-                    <Input
-                      dir="ltr"
-                      value={form.phone}
-                      onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                      placeholder="01112345678"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-bold text-[#5c5448] block mb-1.5">
-                      {t("المحافظة *", "Governorate *")}
-                    </label>
-                    <select
-                      value={form.governorate}
-                      onChange={(e) => setForm({ ...form, governorate: e.target.value })}
-                      className="w-full rounded-xl border border-input bg-background px-3.5 py-2.5 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-[#d5af58]"
-                    >
-                      {EGYPT_GOVERNORATES.map((gov) => (
-                        <option key={gov} value={gov}>{gov}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="text-xs font-bold text-[#5c5448] block mb-1.5">
-                      {t("المدينة / المنطقة", "City / Area")}
-                    </label>
-                    <Input
-                      value={form.city}
-                      onChange={(e) => setForm({ ...form, city: e.target.value })}
-                      placeholder="مثال: مدينة نصر / التجمع الخامس"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-[#5c5448] block mb-1.5">
-                    {t("العنوان التفصيلي (الشارع - رقم العمارة - الدور) *", "Detailed Street Address *")}
-                  </label>
-                  <Textarea
-                    value={form.address}
-                    onChange={(e) => setForm({ ...form, address: e.target.value })}
-                    placeholder="مثال: شارع التسعين الشمالي، عمارة 45، الدور الثالث شقة 6"
-                    rows={2}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-[#5c5448] block mb-1.5">
-                    {t("ملاحظات خاصة بالتصميم أو التوصيل (اختياري)", "Special Notes / Custom Requests")}
-                  </label>
-                  <Textarea
-                    value={form.notes}
-                    onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                    placeholder="مثال: برجاء دهان الاستيل بلون ذهبي مطفي، أو مواعيد تسليم مسائية..."
-                    rows={2}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Order Summary & Confirm */}
-            <div className="space-y-6">
-              <div className="rounded-3xl border border-[#e8e2d8] bg-white p-6 shadow-xs space-y-6">
-                <h2 className="text-xl font-bold text-[#24211d] border-b border-[#eee8dd] pb-4">
-                  {t("محتويات الطلب", "Order Summary")}
+          <div className="mt-6 grid gap-8 lg:grid-cols-[1fr_380px]">
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div className="space-y-1">
+                <h2 className="text-lg font-semibold">
+                  {lang === "ar" ? "بيانات التواصل والتوصيل" : "Contact & delivery details"}
                 </h2>
+                <p className="text-sm text-muted-foreground">
+                  {lang === "ar"
+                    ? "سنتواصل معك لتأكيد الطلب وترتيب التوصيل."
+                    : "We'll contact you to confirm the order and arrange delivery."}
+                </p>
+              </div>
 
-                <div className="space-y-3 max-h-64 overflow-y-auto">
-                  {items.map((item) => (
-                    <div key={item.id} className="flex items-center justify-between text-sm py-2 border-b border-[#f4f0e8]">
-                      <div>
-                        <span className="font-bold text-[#24211d] block">{item.nameAr || item.name}</span>
-                        <span className="text-xs text-muted-foreground">
-                          الكمية: {item.quantity} {item.size ? `· المقاس: ${item.size}` : ""}
-                        </span>
-                      </div>
-                      <span className="font-black text-[#24211d]" dir="ltr">
-                        {formatPrice(item.price * item.quantity)} ج.م
-                      </span>
-                    </div>
-                  ))}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="c-name">{lang === "ar" ? "الاسم" : "Name"} *</Label>
+                  <Input
+                    id="c-name"
+                    required
+                    autoComplete="name"
+                    value={form.customerName}
+                    onChange={(e) => setField("customerName", e.target.value)}
+                    placeholder={lang === "ar" ? "الاسم الكامل" : "Full name"}
+                  />
                 </div>
-
-                <div className="space-y-2 text-sm border-t border-[#eee8dd] pt-4">
-                  <div className="flex justify-between text-muted-foreground">
-                    <span>{t("المجموع الفرعي:", "Subtotal:")}</span>
-                    <span dir="ltr">{formatPrice(subtotal)} ج.م</span>
-                  </div>
-                  {discount > 0 && (
-                    <div className="flex justify-between text-emerald-600 font-bold">
-                      <span>{t("الخصم:", "Discount:")}</span>
-                      <span dir="ltr">-{formatPrice(discount)} ج.م</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between text-lg font-black text-[#24211d] border-t border-[#eee8dd] pt-3">
-                    <span>{t("الإجمالي المطلوب:", "Total Amount:")}</span>
-                    <span className="text-[#a8822d]" dir="ltr">{formatPrice(total)} ج.م</span>
-                  </div>
-                </div>
-
-                <Button
-                  type="submit"
-                  disabled={createOrder.isPending}
-                  className="w-full h-12 bg-[#24211d] text-white hover:bg-[#a8822d] font-bold text-base rounded-xl shadow-lg"
-                >
-                  {createOrder.isPending ? "جاري تأكيد الطلب..." : "تأكيد وإرسال الطلب الآن"}
-                </Button>
-
-                <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
-                  <ShieldCheck className="h-4 w-4 text-emerald-600" />
-                  <span>الدفع عند الاستلام والمعاينة</span>
+                <div className="space-y-2">
+                  <Label htmlFor="c-phone">{lang === "ar" ? "رقم الهاتف" : "Phone number"} *</Label>
+                  <Input
+                    id="c-phone"
+                    required
+                    autoComplete="tel"
+                    dir="ltr"
+                    value={form.customerPhone}
+                    onChange={(e) => setField("customerPhone", e.target.value)}
+                    placeholder={lang === "ar" ? "01xxxxxxxxx" : "01xxxxxxxxx"}
+                  />
                 </div>
               </div>
-            </div>
-          </form>
+
+              <div className="space-y-2">
+                <Label htmlFor="c-email">{lang === "ar" ? "البريد الإلكتروني" : "Email"} ({lang === "ar" ? "اختياري — لاستقبال تحديثات الطلب" : "optional — for order updates"})</Label>
+                <Input
+                  id="c-email"
+                  type="email"
+                  autoComplete="email"
+                  dir="ltr"
+                  value={form.customerEmail}
+                  onChange={(e) => setField("customerEmail", e.target.value)}
+                  placeholder={lang === "ar" ? "example@email.com" : "example@email.com"}
+                />
+                {emailError && <p className="text-sm text-destructive">{emailError}</p>}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="c-address">{lang === "ar" ? "العنوان" : "Address"}</Label>
+                <Input
+                  id="c-address"
+                  value={form.customerAddress}
+                  onChange={(e) => setField("customerAddress", e.target.value)}
+                  placeholder={lang === "ar" ? "المحافظة — المنطقة — الشارع" : "Governorate — area — street"}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="c-message">{lang === "ar" ? "ملاحظات إضافية" : "Additional notes"}</Label>
+                <Textarea
+                  id="c-message"
+                  rows={2}
+                  value={form.message}
+                  onChange={(e) => setField("message", e.target.value)}
+                  placeholder={lang === "ar" ? "أي تفاصيل عن التصميم أو التوصيل..." : "Any details about the design or delivery..."}
+                />
+              </div>
+
+              <div className="rounded-lg border border-border/70 bg-card p-4">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="c-coupon" className="font-semibold">
+                    <BadgeCheck className="me-1 inline h-4 w-4" />
+                    {lang === "ar" ? "كوبون الخصم" : "Coupon code"}
+                  </Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={!couponCode.trim() || validateCoupon.isPending}
+                    onClick={() => {
+                      setCouponState((s) => ({ ...s, checking: true }));
+                      validateCoupon.mutate({ code: couponCode.trim().toUpperCase(), orderValue: subtotal });
+                    }}
+                  >
+                    {validateCoupon.isPending && <Loader2 className="me-1 h-3.5 w-3.5 animate-spin" />}
+                    {lang === "ar" ? "تطبيق" : "Apply"}
+                  </Button>
+                </div>
+                <Input
+                  id="c-coupon"
+                  className="mt-3"
+                  dir="ltr"
+                  placeholder={lang === "ar" ? "أدخل كود الكوبون" : "Enter coupon code"}
+                  value={couponCode}
+                  onChange={(e) => {
+                    setCouponCode(e.target.value);
+                    if (couponState.valid !== null) setCouponState({ valid: null, discount: 0, message: "", checking: false });
+                  }}
+                />
+                {couponState.message && (
+                  <p className={`mt-2 text-sm ${couponState.valid ? "text-green-600" : "text-destructive"}`}>
+                    {couponState.message}
+                  </p>
+                )}
+              </div>
+
+              <Button type="submit" size="lg" className="w-full" disabled={createCartOrder.isPending}>
+                {createCartOrder.isPending && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
+                {lang === "ar" ? "تأكيد الطلب" : "Place order"}
+              </Button>
+
+              <p className="text-center text-xs text-muted-foreground">
+                {lang === "ar"
+                  ? "بتأكيد الطلب أنت توافق على تواصل فريقنا معك لتأكيد التفاصيل. الدفع عند الاستلام أو عبر واتساب."
+                  : "By placing the order you agree that our team will contact you to confirm the details. Payment on delivery or via WhatsApp."}
+              </p>
+            </form>
+
+            <aside className="h-fit rounded-lg border border-border/70 bg-card p-5">
+              <h2 className="text-lg font-semibold">
+                {lang === "ar" ? "ملخص الطلب" : "Order summary"}
+              </h2>
+              <div className="mt-4 space-y-3">
+                {availableItems.map((item) => {
+                  const product = productById.get(item.productId);
+                  const variant = [item.selectedSize, item.selectedColor].filter(Boolean).join(" • ");
+                  return (
+                    <div key={`${item.productId}|${item.selectedSize ?? ""}|${item.selectedColor ?? ""}`} className="flex justify-between gap-3 text-sm">
+                      <div className="min-w-0">
+                        <p className="truncate">
+                          {product ? (lang === "ar" ? product.nameAr : product.name) : `#${item.productId}`}
+                        </p>
+                        {variant && <p dir="auto" className="text-muted-foreground">{variant} × {item.quantity}</p>}
+                      </div>
+                      <p className="shrink-0 font-medium">{priceDisplay(item.unitPrice * item.quantity, lang)}</p>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-4 border-t border-border/70 pt-4 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>{lang === "ar" ? "المجموع الفرعي" : "Subtotal"}</span>
+                  <span>{priceDisplay(subtotal, lang)}</span>
+                </div>
+                {discount > 0 && (
+                  <div className="flex justify-between text-sm text-green-600">
+                    <span>{lang === "ar" ? "الخصم" : "Discount"}</span>
+                    <span>− {priceDisplay(discount, lang)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between border-t border-border/70 pt-3 text-base font-bold">
+                  <span>{lang === "ar" ? "الإجمالي" : "Total"}</span>
+                  <span>{priceDisplay(finalTotal, lang)}</span>
+                </div>
+              </div>
+              <div className="mt-5 space-y-2 text-sm text-muted-foreground">
+                <p className="flex items-center gap-2">
+                  <Truck className="h-4 w-4" />
+                  {lang === "ar" ? "التوصيل يُحدد معك أثناء تأكيد الطلب" : "Delivery details confirmed with you on order confirmation"}
+                </p>
+                <p className="flex items-center gap-2">
+                  <MessageCircle className="h-4 w-4" />
+                  {lang === "ar" ? "متاح أيضًا الطلب المباشر عبر واتساب من صفحة المنتج" : "You can also order directly via WhatsApp from the product page"}
+                </p>
+              </div>
+            </aside>
+          </div>
         )}
-      </section>
+      </div>
     </PublicLayout>
   );
 }

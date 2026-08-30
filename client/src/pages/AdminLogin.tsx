@@ -1,26 +1,31 @@
-import React, { useState } from "react";
-import { Link, useLocation } from "wouter";
-import { trpc } from "@/lib/trpc";
-import { useLanguage } from "@/contexts/LanguageContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
+import { trpc } from "@/lib/trpc";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { useState } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { ShieldCheck, Phone, Lock, Eye, EyeOff } from "lucide-react";
+import { Link, useLocation } from "wouter";
 
 export default function AdminLogin() {
-  const { lang, isRTL, t } = useLanguage();
+  const { lang } = useLanguage();
   const [, setLocation] = useLocation();
-
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(true);
+  const [submitted, setSubmitted] = useState(false);
+  const REMEMBER_KEY = "admin-login-remember";
+  const [rememberMe, setRememberMe] = useState(() => {
+    if (typeof localStorage === "undefined") return true;
+    const saved = localStorage.getItem(REMEMBER_KEY);
+    return saved === null ? true : saved === "1";
+  });
 
+  const isRTL = lang === "ar";
   const me = trpc.adminAuth.me.useQuery();
-
   const login = trpc.adminAuth.login.useMutation({
     onSuccess: (data) => {
       toast.success(isRTL ? `أهلاً بك في لوحة التحكم، ${data.name}` : `Welcome back, ${data.name}`);
@@ -28,27 +33,28 @@ export default function AdminLogin() {
       setTimeout(() => setLocation("/admin"), 300);
     },
     onError: (error) => {
-      toast.error(error.message || (isRTL ? "بيانات الدخول غير صحيحة" : "Invalid login credentials"));
+      toast.error(error.message);
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = (event: React.FormEvent) => {
+    event.preventDefault();
     if (!phone.trim() || !password.trim()) {
-      toast.error(isRTL ? "يرجى إدخال رقم الهاتف وكلمة المرور" : "Please enter phone and password");
+      toast.error(isRTL ? "أدخل رقم الهاتف وكلمة المرور" : "Enter your phone number and password");
       return;
     }
-    login.mutate({
-      phone: phone.trim(),
-      password: password.trim(),
-      rememberMe,
-    });
+    setSubmitted(true);
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem(REMEMBER_KEY, rememberMe ? "1" : "0");
+    }
+    login.mutate({ phone: phone.trim(), password, rememberMe });
   };
 
+  // If already signed in as admin (OAuth or previous phone session), skip straight in.
   if (me.data?.name) {
     return (
       <div className="mx-auto flex min-h-[70vh] max-w-md flex-col items-center justify-center gap-6 px-4 text-center">
-        <ShieldCheck className="h-16 w-16 text-[#d5af58]" />
+        <ShieldCheck className="h-14 w-14 text-[#ad842f]" />
         <div>
           <h1 className="text-2xl font-black text-[#24211d]">
             {isRTL ? "أنت مسجل الدخول بالفعل" : "You are already signed in"}
@@ -58,8 +64,8 @@ export default function AdminLogin() {
           </p>
         </div>
         <div className="flex gap-3">
-          <Button className="bg-[#24211d] text-white hover:bg-[#d5af58] hover:text-[#24211d] font-bold" onClick={() => setLocation("/admin")}>
-            {isRTL ? "فتح لوحة التحكم" : "Open Dashboard"}
+          <Button className="bg-[#26231e] text-white hover:bg-[#ad842f]" onClick={() => setLocation("/admin")}>
+            {isRTL ? "فتح لوحة التحكم" : "Open dashboard"}
           </Button>
           <Button variant="outline" onClick={() => setLocation("/")}>
             {isRTL ? "المتجر" : "Store"}
@@ -70,77 +76,112 @@ export default function AdminLogin() {
   }
 
   return (
-    <div className="mx-auto flex min-h-[80vh] max-w-md flex-col justify-center gap-8 px-4 py-12">
-      <div className="text-center space-y-2">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#24211d] shadow-lg">
-          <ShieldCheck className="h-9 w-9 text-[#d5af58]" />
+    <div className="mx-auto flex min-h-[75vh] max-w-md flex-col justify-center gap-8 px-4 py-10">
+      <div className="text-center">
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-[#26231e]">
+          <ShieldCheck className="h-9 w-9 text-[#ad842f]" />
         </div>
         <h1 className="text-3xl font-black tracking-tight text-[#24211d]">
-          {isRTL ? "دخول لوحة الإدارة والموظفين" : "Admin & Staff Login"}
+          {isRTL ? "دخول لوحة التحكم" : "Admin login"}
         </h1>
-        <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+        <p className="mt-2 text-sm text-[#746c60]">
           {isRTL
-            ? "دخول مخصص لأرقام الإدارة والمشرفين لمتابعة الطلبات وتحديث الكتالوج."
-            : "Authorized portal for administrators and staff to manage orders and catalogue."}
+            ? "دخول مخصص لأرقام الإدارة المصرّح لها فقط. هذا الدخول منفصل تماماً عن حسابات العملاء."
+            : "Restricted to authorized admin phone numbers only. This login is fully separate from customer accounts."}
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="rounded-3xl border border-[#e8e2d8] bg-white p-8 shadow-sm space-y-4">
-        <div>
-          <Label className="text-xs font-bold text-[#514c42] block mb-1.5">
-            {isRTL ? "رقم الهاتف المعتمد *" : "Phone Number *"}
-          </Label>
-          <div className="relative">
-            <Input
-              type="tel"
-              dir="ltr"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="01121748885"
-              className="font-mono text-center font-bold"
-              required
-            />
-            <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+      <form
+        onSubmit={handleSubmit}
+        className="rounded-2xl border border-[#d9d3c4] bg-white p-6 shadow-sm"
+        dir={isRTL ? "rtl" : "ltr"}
+      >
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="admin-phone" className="font-bold text-[#514c42]">
+              {isRTL ? "رقم الهاتف" : "Phone number"}
+            </Label>
+            <div className="relative">
+              <Phone className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#958b7e]" />
+              <Input
+                id="admin-phone"
+                type="tel"
+                dir="ltr"
+                value={phone}
+                onChange={(event) => setPhone(event.target.value)}
+                placeholder={isRTL ? "01XXXXXXXXX" : "01XXXXXXXXX"}
+                inputMode="tel"
+                autoComplete="tel"
+                className="start-9 h-11 border-[#d9d3c4] bg-white text-center font-mono text-base"
+              />
+            </div>
           </div>
-        </div>
 
-        <div>
-          <Label className="text-xs font-bold text-[#514c42] block mb-1.5">
-            {isRTL ? "كلمة المرور *" : "Password *"}
-          </Label>
-          <div className="relative">
-            <Input
-              type={showPassword ? "text" : "password"}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="font-mono"
-              required
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute left-3 top-3 text-muted-foreground hover:text-[#24211d]"
-            >
-              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="admin-password" className="font-bold text-[#514c42]">
+              {isRTL ? "كلمة المرور" : "Password"}
+            </Label>
+            <div className="relative">
+              <Lock className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#958b7e]" />
+              <Input
+                id="admin-password"
+                type={showPassword ? "text" : "password"}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder={isRTL ? "كلمة المرور" : "Password"}
+                autoComplete="current-password"
+                className="start-9 end-11 h-11 border-[#d9d3c4] bg-white"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((value) => !value)}
+                className="absolute end-3 top-1/2 -translate-y-1/2 text-[#958b7e] transition hover:text-[#ad842f]"
+                aria-label={isRTL ? "إظهار كلمة المرور" : "Show password"}
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+            </div>
           </div>
-        </div>
 
-        <Button
-          type="submit"
-          disabled={login.isPending}
-          className="w-full bg-[#24211d] text-white hover:bg-[#d5af58] hover:text-[#24211d] font-bold h-12 rounded-xl text-base shadow-md"
-        >
-          {login.isPending ? <Spinner size="sm" /> : isRTL ? "تسجيل الدخول" : "Sign In"}
-        </Button>
+          <label className="flex cursor-pointer items-center gap-2 select-none">
+            <Checkbox
+              checked={rememberMe}
+              onCheckedChange={(value) => setRememberMe(value === true)}
+              id="admin-remember"
+            />
+            <span className="text-sm font-medium text-[#514c42]">
+              {isRTL ? "تذكرني — إبقاء الجلسة لمدة أطول" : "Remember me — keep me signed in longer"}
+            </span>
+          </label>
 
-        <div className="pt-2 text-center">
-          <Link href="/" className="text-xs text-muted-foreground hover:text-[#a8822d] font-bold">
-            ← {isRTL ? "العودة للمتجر الرئيسي" : "Back to Store"}
-          </Link>
+          <Button
+            type="submit"
+            disabled={login.isPending || submitted}
+            className="h-11 bg-[#26231e] text-base font-bold text-white hover:bg-[#ad842f]"
+          >
+            {login.isPending ? (
+              <span className="inline-flex items-center gap-2">
+                <Spinner className="h-4 w-4" />
+                {isRTL ? "جاري التحقق..." : "Verifying..."}
+              </span>
+            ) : (
+              isRTL ? "دخول لوحة التحكم" : "Sign in to dashboard"
+            )}
+          </Button>
+
+          <p className="text-center text-xs text-[#958b7e]">
+            {isRTL
+              ? "الدخول متاح فقط للرقمين المصرّح لهما من الإدارة. أي محاولة خاطئة متكررة توقف الدخول 15 دقيقة."
+              : "Only authorized admin numbers can sign in. Repeated wrong attempts block login for 15 minutes."}
+          </p>
         </div>
       </form>
+
+      <div className="text-center">
+        <Link href="/" className="text-sm font-semibold text-[#8b6821] transition hover:text-[#ad842f]">
+          {isRTL ? "← العودة إلى المتجر" : "Back to store →"}
+        </Link>
+      </div>
     </div>
   );
 }

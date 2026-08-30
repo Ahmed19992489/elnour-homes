@@ -1,86 +1,31 @@
-import React from "react";
-import { useParams, Link } from "wouter";
 import PublicLayout from "@/components/storefront/PublicLayout";
 import ProductCard from "@/components/storefront/ProductCard";
-import { trpc } from "@/lib/trpc";
-import { useLanguage } from "@/contexts/LanguageContext";
 import { UpdateHead } from "@/components/UpdateHead";
-import { Loader2, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { trpc } from "@/lib/trpc";
+import { ArrowLeft, Loader2, PackageSearch } from "lucide-react";
+import { Link, useParams } from "wouter";
 
 export default function CategoryPage() {
   const { slug } = useParams<{ slug: string }>();
-  const { lang, isRTL, t } = useLanguage();
-
-  const { data: category, isLoading: catLoading } = trpc.categories.bySlug.useQuery({ slug: slug || "" });
-  const { data: rawProducts, isLoading: prodLoading } = trpc.products.byCategory.useQuery({ category: slug || "", slug: slug || "" });
-
-  const products = Array.isArray(rawProducts) ? rawProducts : [];
-
-  const catName = category ? (lang === "ar" ? category.nameAr : category.nameEn) : (slug || "القسم");
-  const catDesc = category ? (lang === "ar" ? category.descriptionAr : category.descriptionEn) : "";
+  const { lang, isRTL } = useLanguage();
+  const { data: categories, isLoading: categoriesLoading } = trpc.categories.active.useQuery();
+  const { data: products, isLoading: productsLoading } = trpc.products.active.useQuery({ category: slug });
+  const category = categories?.find((item) => item.slug === slug);
+  const title = lang === "ar" ? category?.nameAr : category?.nameEn;
+  const description = lang === "ar" ? category?.descriptionAr : category?.descriptionEn;
+  const loading = categoriesLoading || productsLoading;
 
   UpdateHead({
-    title: `${catName} | Elnour Homes`,
-    description: catDesc || `تصفح تشكيلة ${catName} الفاخرة من استيل وديكورات Elnour Homes.`,
+    title: title ? `${title} | Elnour for STEEL` : (lang === "ar" ? "فئة المنتجات | Elnour for STEEL" : "Product Category | Elnour for STEEL"),
+    description: description || (lang === "ar" ? "تصفح منتجات الفئة من ديكورات وفواصل وطرابيزات الاستيل" : "Browse products in this category: steel decor, dividers and tables"),
+    path: `/products/${slug}`,
   });
 
-  return (
-    <PublicLayout>
-      {/* Category Header */}
-      <section className="border-b border-[#e8e2d8] bg-[#f5f0e6] py-12 md:py-16">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center gap-2 text-xs font-bold text-[#a8822d] mb-4">
-            <Link href="/" className="hover:underline">{t("الرئيسية", "Home")}</Link>
-            <span>/</span>
-            <Link href="/products" className="hover:underline">{t("المنتجات", "Products")}</Link>
-            <span>/</span>
-            <span className="text-[#24211d]">{catName}</span>
-          </div>
-
-          <h1 className="text-3xl md:text-5xl font-black text-[#24211d]">
-            {catName}
-          </h1>
-          {catDesc && (
-            <p className="mt-3 text-base text-[#6b6255] max-w-2xl">
-              {catDesc}
-            </p>
-          )}
-        </div>
-      </section>
-
-      {/* Category Products */}
-      <section className="container mx-auto px-4 py-12">
-        {prodLoading ? (
-          <div className="flex justify-center py-20">
-            <Loader2 className="h-10 w-10 animate-spin text-[#d5af58]" />
-          </div>
-        ) : products.length > 0 ? (
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {products.map((product) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                categoryName={catName}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-3xl border border-dashed border-[#ddd6c8] bg-white p-16 text-center max-w-md mx-auto space-y-4">
-            <h3 className="text-xl font-bold text-[#24211d]">
-              {t("لا توجد منتجات في هذا القسم حالياً", "No products in this category yet")}
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              {t("تابعنا قريباً لإضافة موديلات جديدة أو تواصل معنا لتفصيل طلبك الخاص.", "Check back soon or contact us directly for custom fabrication.")}
-            </p>
-            <Link href="/products">
-              <Button className="bg-[#24211d] text-white hover:bg-[#a8822d] font-bold rounded-xl">
-                {t("تصفح باقي الأقسام", "Browse Other Categories")}
-              </Button>
-            </Link>
-          </div>
-        )}
-      </section>
-    </PublicLayout>
-  );
+  return <PublicLayout>
+    <section className="bg-[#eee9df] px-4 py-16 md:py-20"><div className="container"><Link href="/products" className="inline-flex items-center text-sm font-bold text-[#8c681d] hover:text-[#24211d]"><ArrowLeft className={`h-4 w-4 ${isRTL ? "ml-2" : "mr-2 rotate-180"}`} />{lang === "ar" ? "كل المنتجات" : "All products"}</Link><h1 className="mt-5 text-4xl font-black text-[#24211d] md:text-6xl">{title || (lang === "ar" ? "فئة المنتجات" : "Product category")}</h1>{description ? <p className="mt-4 max-w-2xl text-lg leading-8 text-[#5e574c]">{description}</p> : null}</div></section>
+    <section className="container py-14 md:py-20">{loading ? <div className="flex justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-[#ad842f]" /></div> : !category ? <div className="rounded-2xl border border-dashed border-[#c8beae] bg-white px-6 py-20 text-center"><PackageSearch className="mx-auto h-10 w-10 text-[#ad842f]" /><p className="mt-4 text-[#625c51]">{lang === "ar" ? "هذه الفئة غير متاحة." : "This category is not available."}</p><Link href="/products"><Button variant="outline" className="mt-5">{lang === "ar" ? "العودة للمنتجات" : "Back to products"}</Button></Link></div> : products?.length ? <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">{products.map((product) => <ProductCard key={product.id} product={product} categoryName={title} />)}</div> : <div className="rounded-2xl border border-dashed border-[#c8beae] bg-white px-6 py-20 text-center"><PackageSearch className="mx-auto h-10 w-10 text-[#ad842f]" /><p className="mt-4 text-[#625c51]">{lang === "ar" ? "لا توجد منتجات ظاهرة في هذه الفئة حالياً." : "There are no visible products in this category yet."}</p></div>}</section>
+  </PublicLayout>;
 }
+

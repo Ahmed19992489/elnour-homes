@@ -17,8 +17,10 @@ const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.length > 0;
 
 /**
- * Phone-based admin session — verifies the `admin_session_id` JWT cookie
- * and creates a synthesized User with role "admin" or "moderator".
+ * Phone-based admin session — an alternative admin login that does not depend
+ * on Manus OAuth. When the OAuth cookie is missing or invalid we fall back to
+ * the `admin_session_id` cookie, verify the JWT signature and the matching
+ * active row in adminSessions, and synthesize a User with role "admin".
  */
 async function authenticateAdminSession(
   cookieHeader: string | undefined
@@ -52,12 +54,10 @@ async function authenticateAdminSession(
     return null;
   }
 
-  const session = await db.getActiveAdminSession(jti);
+  const session = await db.getActiveAdminSession(jti, new Date());
   if (!session) return null;
 
-  const credential = await db.getAdminCredentialByPhone(session.adminPhone);
-  const role = credential?.role === "moderator" ? "moderator" : "admin";
-
+  // Return a synthesized User-shaped object with full admin role.
   return {
     id: 0,
     openId,
@@ -66,11 +66,13 @@ async function authenticateAdminSession(
     phone: session.adminPhone,
     address: null,
     loginMethod: "admin_phone",
-    role: role as any,
+    role: "admin",
     createdAt: new Date(),
     updatedAt: new Date(),
     lastSignedIn: new Date(),
+    referralCode: null,
   } as User;
+
 }
 
 export async function createContext(
@@ -80,14 +82,15 @@ export async function createContext(
 
   try {
     user = await sdk.authenticateRequest(opts.req);
-  } catch {
+  } catch (error) {
+    // OAuth is not available — try the phone-based admin session.
     user = null;
   }
 
   if (!user) {
     try {
       user = await authenticateAdminSession(opts.req.headers.cookie);
-    } catch {
+    } catch (error) {
       user = null;
     }
   }

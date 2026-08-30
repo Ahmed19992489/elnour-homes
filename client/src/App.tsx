@@ -1,38 +1,26 @@
-import React from "react";
-import { Route, Switch } from "wouter";
 import { Toaster } from "@/components/ui/sonner";
+import React from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useRoleRedirect } from "@/hooks/useRoleRedirect";
+import NotFound from "@/pages/NotFound";
+import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
 import { CartProvider } from "./contexts/CartContext";
 import { WishlistProvider } from "./contexts/WishlistContext";
-
 import Home from "./pages/Home";
 import ProductDetail from "./pages/ProductDetail";
 import CatalogPage from "./pages/CatalogPage";
 import CategoryPage from "./pages/CategoryPage";
 import ContentPage from "./pages/ContentPage";
 import WorkPage from "./pages/WorkPage";
-import CartPage from "./pages/CartPage";
-import CheckoutPage from "./pages/CheckoutPage";
-import OffersPage from "./pages/OffersPage";
-import WishlistPage from "./pages/WishlistPage";
-import ContactPage from "./pages/ContactPage";
-import LegalPage from "./pages/LegalPages";
-import MyAccount from "./pages/MyAccount";
-import OrderDetails from "./pages/OrderDetails";
-import NotFound from "./pages/NotFound";
-import AdminLogin from "./pages/AdminLogin";
-
-// Admin & Staff Management Pages
-import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminOrders from "./pages/admin/AdminOrders";
 import AdminProducts from "./pages/admin/AdminProducts";
-import AdminCategories from "./pages/admin/AdminCategories";
 import AdminGallery from "./pages/admin/AdminGallery";
+import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminContent from "./pages/admin/AdminContent";
+import AdminCategories from "./pages/admin/AdminCategories";
 import AdminCoupons from "./pages/admin/AdminCoupons";
 import AdminMedia from "./pages/admin/AdminMedia";
 import AdminReviews from "./pages/admin/AdminReviews";
@@ -40,6 +28,15 @@ import AdminReports from "./pages/admin/AdminReports";
 import AdminStockAlerts from "./pages/admin/AdminStockAlerts";
 import AdminSettings from "./pages/admin/AdminSettings";
 import AdminAdmins from "./pages/admin/AdminAdmins";
+import AdminLogin from "./pages/AdminLogin";
+import MyAccount from "./pages/MyAccount";
+import OrderDetails from "./pages/OrderDetails";
+import CartPage from "./pages/CartPage";
+import CheckoutPage from "./pages/CheckoutPage";
+import OffersPage from "./pages/OffersPage";
+import WishlistPage from "./pages/WishlistPage";
+import ContactPage from "./pages/ContactPage";
+import LegalPage from "./pages/LegalPages";
 
 function Router() {
   useRoleRedirect();
@@ -84,21 +81,23 @@ function Router() {
   );
 }
 
-export default function App() {
+function App() {
   return (
     <ErrorBoundary>
       <ThemeProvider defaultTheme="light">
         <LanguageProvider>
           <CartProvider>
-            <WishlistProvider>
-              <TooltipProvider>
-                <Toaster richColors closeButton position="top-center" />
-                <Router />
-              </TooltipProvider>
-            </WishlistProvider>
+          <WishlistProvider>
+          <TooltipProvider>
+            <Toaster richColors closeButton position="top-center" />
+            <Router />
+          </TooltipProvider>
+          </WishlistProvider>
           </CartProvider>
         </LanguageProvider>
       </ThemeProvider>
     </ErrorBoundary>
   );
 }
+
+export default App;

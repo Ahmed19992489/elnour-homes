@@ -7,8 +7,8 @@ export type OrderWhatsAppMessageInput = {
   orderUrl?: string;
 };
 
-export const DEFAULT_BUSINESS_WHATSAPP = "01121748885";
-export const DEFAULT_BUSINESS_WHATSAPP_MESSAGE = "مرحباً، أرغب في الاستفسار عن أعمال Elnour Homes Luxury Steel";
+export const DEFAULT_BUSINESS_WHATSAPP = "01118182424";
+export const DEFAULT_BUSINESS_WHATSAPP_MESSAGE = "مرحباً، أرغب في الاستفسار عن أعمال Elnour for STEEL";
 
 const STATUS_COPY: Record<string, string> = {
   new: "تم استلام طلبك",
@@ -38,7 +38,8 @@ export function buildOrderWhatsAppMessage(order: OrderWhatsAppMessageInput) {
   const status = STATUS_COPY[order.status] || "تم تحديث طلبك";
   const product = order.productName?.trim() ? `\nالمنتج: ${order.productName.trim()}` : "";
   const details = order.orderUrl ? `\nلمتابعة التفاصيل: ${order.orderUrl}` : "";
-  return `مرحبًا ${name}،\n${status}.\nرقم الطلب: #${order.id}${product}${details}\n\nElnour Homes`;
+
+  return `مرحبًا ${name}،\n${status}.\nرقم الطلب: #${order.id}${product}${details}\n\nElnour for STEEL`;
 }
 
 export function buildOrderWhatsAppUrl(order: OrderWhatsAppMessageInput) {

@@ -1,127 +1,209 @@
-import React, { useState } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Plus, Trash2, Image, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Loader2, Plus, Trash2, Image, Upload } from "lucide-react";
+import { useState, useRef } from "react";
 import { toast } from "sonner";
 
 export default function AdminGallery() {
-  const { data: galleryItems, isLoading, refetch } = trpc.gallery.list.useQuery();
-  const [dialogOpen, setDialogOpen] = useState(false);
-
+  const { user, isAuthenticated } = useAuth();
+  const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
     title: "",
-    category: "ترابيزات",
     imageUrl: "",
+    category: "أعمال منجزة",
   });
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const addItem = trpc.gallery.add.useMutation({
+  const { data: items, isLoading, refetch } = trpc.gallery.list.useQuery();
+  const utils = trpc.useUtils();
+
+  const createItem = trpc.gallery.create.useMutation({
     onSuccess: () => {
-      toast.success("تمت إضافة الصورة إلى المعرض بنجاح");
-      setDialogOpen(false);
-      setForm({ title: "", category: "ترابيزات", imageUrl: "" });
-      void refetch();
+      toast.success("تم إضافة الصورة");
+      setOpen(false);
+      setForm({ title: "", imageUrl: "", category: "أعمال منجزة" });
+      utils.gallery.list.invalidate();
     },
-    onError: (e) => toast.error(e.message),
+    onError: () => toast.error("حدث خطأ"),
   });
 
   const deleteItem = trpc.gallery.delete.useMutation({
     onSuccess: () => {
-      toast.success("تم حذف الصورة من المعرض");
-      void refetch();
+      toast.success("تم حذف الصورة");
+      utils.gallery.list.invalidate();
     },
-    onError: (e) => toast.error(e.message),
+    onError: () => toast.error("حدث خطأ"),
   });
 
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.title.trim() || !form.imageUrl.trim()) {
-      toast.error("يرجى إدخال عنوان ورابط الصورة");
+  const uploadImage = trpc.upload.uploadImage.useMutation({
+    onSuccess: (data) => {
+      setForm({ ...form, imageUrl: data.url });
+      setUploading(false);
+      toast.success("تم رفع الصورة - انقر إضافة لحفظها");
+    },
+    onError: () => {
+      setUploading(false);
+      toast.error("فشل رفع الصورة");
+    },
+  });
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("حجم الصورة يجب أن يكون أقل من 5 ميجابايت");
       return;
     }
-    addItem.mutate(form);
+
+    if (!file.type.startsWith("image/")) {
+      toast.error("يرجى اختيار ملف صورة");
+      return;
+    }
+
+    setUploading(true);
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64 = reader.result as string;
+      uploadImage.mutate({
+        filename: file.name,
+        base64,
+        contentType: file.type,
+      });
+    };
+    reader.readAsDataURL(file);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    createItem.mutate(form);
+  };
+
+  if (!isAuthenticated || user?.role !== 'admin') {
+    return <div className="p-8 text-center">ليس لديك صلاحية الوصول</div>;
+  }
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-[#24211d]">إدارة معرض الأعمال</h1>
-            <p className="text-sm text-muted-foreground mt-1">الصور المنفذة التي تظهر في صفحة أعمالنا وسابقة المشاريع.</p>
-          </div>
-          <Button onClick={() => setDialogOpen(true)} className="bg-[#24211d] text-white hover:bg-[#d5af58] hover:text-[#24211d] font-bold rounded-xl">
-            <Plus className="ml-1.5 h-4 w-4" />
-            إضافة عمل جديد
-          </Button>
+          <h1 className="text-2xl font-bold">معرض الأعمال</h1>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button>
+                <Plus className="ml-2 h-4 w-4" />
+                إضافة صورة
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>إضافة صورة للمعرض</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label>عنوان الصورة</Label>
+                  <Input
+                    value={form.title}
+                    onChange={(e) => setForm({ ...form, title: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>رفع صورة</Label>
+                  <Input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                  />
+                  {uploading && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      جاري رفع الصورة...
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label>أو أدخل رابط الصورة مباشرة</Label>
+                  <Input
+                    value={form.imageUrl}
+                    onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
+                    placeholder="https://example.com/image.jpg"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>الفئة</Label>
+                  <Input
+                    value={form.category}
+                    onChange={(e) => setForm({ ...form, category: e.target.value })}
+                  />
+                </div>
+                {form.imageUrl && (
+                  <div className="aspect-video rounded-lg overflow-hidden border">
+                    <img src={form.imageUrl} alt="معاينة" className="w-full h-full object-cover" />
+                  </div>
+                )}
+                <Button type="submit" className="w-full" disabled={createItem.isPending || !form.imageUrl}>
+                  {createItem.isPending && <Loader2 className="ml-2 h-4 w-4 animate-spin" />}
+                  إضافة
+                </Button>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>الأعمال المعروضة ({galleryItems?.length || 0})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="flex justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-[#d5af58]" />
-              </div>
-            ) : galleryItems && galleryItems.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                {galleryItems.map((item) => (
-                  <div key={item.id} className="group relative rounded-2xl border border-[#eee8dd] bg-white overflow-hidden shadow-xs">
-                    <img src={item.imageUrl} alt={item.title} className="aspect-4/3 w-full object-cover" />
-                    <div className="p-4">
-                      <span className="text-xs font-bold text-[#a8822d] block">{item.category}</span>
-                      <h4 className="font-bold text-sm text-[#24211d] mt-1 truncate">{item.title}</h4>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => deleteItem.mutate({ id: item.id })}
-                        className="mt-3 w-full rounded-xl text-xs font-bold"
-                      >
-                        <Trash2 className="ml-1.5 h-3.5 w-3.5" />
-                        حذف الصورة
-                      </Button>
-                    </div>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : items && items.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {items.map((item) => (
+              <Card key={item.id} className="overflow-hidden group">
+                <div className="aspect-square relative">
+                  <img
+                    src={item.imageUrl}
+                    alt={item.title}
+                    className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                  />
+                  <div className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => {
+                        if (confirm("هل أنت متأكد؟")) {
+                          deleteItem.mutate({ id: item.id });
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-center py-10 text-muted-foreground">لا توجد صور مضافة بعد في المعرض.</p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Dialog */}
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogContent dir="rtl">
-            <DialogHeader>
-              <DialogTitle>إضافة عمل / صورة إلى المعرض</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSave} className="space-y-4 pt-2">
-              <div>
-                <label className="text-xs font-bold block mb-1">عنوان العمل / الوصف القصير *</label>
-                <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="مثال: ترابيزة صالون استيل ذهبي 304" required />
-              </div>
-              <div>
-                <label className="text-xs font-bold block mb-1">القسم / التصنيف *</label>
-                <Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} placeholder="ترابيزات / مرايات / قواطع..." required />
-              </div>
-              <div>
-                <label className="text-xs font-bold block mb-1">رابط الصورة (Image URL) *</label>
-                <Input dir="ltr" value={form.imageUrl} onChange={(e) => setForm({ ...form, imageUrl: e.target.value })} placeholder="https://..." required />
-              </div>
-              <DialogFooter className="pt-4">
-                <Button type="submit" className="w-full bg-[#24211d] text-white hover:bg-[#d5af58] hover:text-[#24211d] font-bold">
-                  إضافة للمعرض
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+                </div>
+                <CardContent className="p-3">
+                  <p className="font-medium text-sm">{item.title}</p>
+                  <p className="text-xs text-muted-foreground">{item.category}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+              <Image className="h-12 w-12 mb-4 opacity-50" />
+              <p className="text-lg">لا توجد صور في المعرض</p>
+              <p className="text-sm mt-2">أضف صور أعمالك المنجزة</p>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </DashboardLayout>
   );

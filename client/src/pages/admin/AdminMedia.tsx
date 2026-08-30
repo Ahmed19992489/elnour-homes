@@ -1,119 +1,254 @@
-import React, { useState } from "react";
-import DashboardLayout from "@/components/DashboardLayout";
+import { useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { UploadCloud, Copy, Check, Image as ImageIcon } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Loader2, Trash2, Images, ShoppingBag, Eye, X } from "lucide-react";
 import { toast } from "sonner";
 
 export default function AdminMedia() {
-  const [fileData, setFileData] = useState<string>("");
-  const [fileName, setFileName] = useState<string>("");
-  const [uploadedUrl, setUploadedUrl] = useState<string>("");
-  const [copied, setCopied] = useState(false);
+  const utils = trpc.useUtils();
+  const { data: productImages, isLoading: loadingProducts } = trpc.mediaLibrary.productImages.useQuery();
+  const { data: galleryImages, isLoading: loadingGallery } = trpc.mediaLibrary.galleryImages.useQuery();
 
-  const uploadMedia = trpc.media.upload.useMutation({
-    onSuccess: (data) => {
-      setUploadedUrl(data.url);
-      toast.success("تم رفع الصورة بنجاح وتوليد الرابط!");
+  const removeProductMutation = trpc.mediaLibrary.removeProductImage.useMutation({
+    onSuccess: (res, vars) => {
+      utils.mediaLibrary.productImages.invalidate();
+      toast.success("تم حذف الصورة من المنتج");
+      if (res.remainingCount === 0) {
+        toast.warning("هذا المنتج أصبح بلا صور — سيُعرض العنصر البديل");
+      }
+      setSelectedProduct(null);
     },
-    onError: (e) => toast.error(e.message),
+    onError: (error) => toast.error("فشل الحذف: " + error.message),
+  });
+  const removeGalleryMutation = trpc.mediaLibrary.removeGalleryImage.useMutation({
+    onSuccess: () => {
+      utils.mediaLibrary.galleryImages.invalidate();
+      toast.success("تم حذف الصورة من المعرض");
+      setDeleteGalleryId(null);
+    },
+    onError: (error) => toast.error("فشل الحذف: " + error.message),
   });
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setFileName(file.name);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFileData(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleUpload = () => {
-    if (!fileData) {
-      toast.error("يرجى اختيار صورة أولاً");
-      return;
-    }
-    uploadMedia.mutate({
-      name: fileName,
-      dataUrl: fileData,
-    });
-  };
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(uploadedUrl);
-    setCopied(true);
-    toast.success("تم نسخ الرابط إلى الحافظة!");
-    setTimeout(() => setCopied(false), 2000);
-  };
+  const [selectedProduct, setSelectedProduct] = useState<{ productId: number; url: string } | null>(null);
+  const [deleteGalleryId, setDeleteGalleryId] = useState<number | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6 max-w-3xl">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#24211d]">مكتبة ورفع الوسائط والصور</h1>
-          <p className="text-sm text-muted-foreground mt-1">رفع صور المنتجات والمشاريع والحصول على روابط مباشرة لاستخدامها في الكتالوج.</p>
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>رفع صورة جديدة</CardTitle>
-            <CardDescription>اختر صورة من جهازك لرفعها فورياً.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="border-2 border-dashed border-[#d5af58]/40 bg-[#faf8f5] rounded-3xl p-8 text-center space-y-4">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#d5af58]/15 text-[#a8822d]">
-                <UploadCloud className="h-8 w-8" />
-              </div>
-              <div>
-                <input
-                  type="file"
-                  id="media-file-input"
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-                <label htmlFor="media-file-input">
-                  <Button type="button" variant="outline" className="font-bold border-[#d5af58] cursor-pointer" onClick={() => document.getElementById("media-file-input")?.click()}>
-                    اختيار ملف صورة
-                  </Button>
-                </label>
-                {fileName && <p className="text-xs font-bold text-[#24211d] mt-2">{fileName}</p>}
-              </div>
-            </div>
-
-            {fileData && (
-              <div className="flex justify-center">
-                <img src={fileData} alt="Preview" className="max-h-48 rounded-xl object-contain border border-[#eee8dd]" />
-              </div>
-            )}
-
-            <Button
-              onClick={handleUpload}
-              disabled={!fileData || uploadMedia.isPending}
-              className="w-full bg-[#24211d] text-white hover:bg-[#d5af58] hover:text-[#24211d] font-bold h-12 rounded-xl"
-            >
-              {uploadMedia.isPending ? "جاري الرفع..." : "رفع الصورة الآن"}
-            </Button>
-
-            {uploadedUrl && (
-              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 space-y-2">
-                <span className="text-xs font-bold text-emerald-800 block">رابط الصورة المباشر:</span>
-                <div className="flex gap-2">
-                  <Input dir="ltr" readOnly value={uploadedUrl} className="bg-white font-mono text-xs" />
-                  <Button size="sm" onClick={handleCopy} className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold shrink-0">
-                    {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                  </Button>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold flex items-center gap-2">
+          <Images className="h-6 w-6 text-primary" />
+          مكتبة الصور
+        </h1>
+        <p className="text-muted-foreground mt-1">
+          احذف أي صورة من الموقع: صور منتجات، صور معرض الأعمال. الصور المحذوفة لا يمكن استعادتها.
+        </p>
       </div>
-    </DashboardLayout>
+
+      <Tabs defaultValue="products">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="products" className="gap-2">
+            <ShoppingBag className="h-4 w-4" />
+            صور المنتجات ({productImages?.length ?? 0})
+          </TabsTrigger>
+          <TabsTrigger value="gallery" className="gap-2">
+            <Images className="h-4 w-4" />
+            معرض الأعمال ({galleryImages?.length ?? 0})
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="products">
+          <Card>
+            <CardContent className="pt-6">
+              {loadingProducts ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              ) : productImages && productImages.length > 0 ? (
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+                  {productImages.map(img => (
+                    <div key={`${img.productId}-${img.url}`} className="group relative rounded-lg border overflow-hidden bg-muted">
+                      <button
+                        type="button"
+                        onClick={() => setPreviewUrl(img.url)}
+                        className="w-full aspect-square"
+                        title="معاينة"
+                      >
+                        <img
+                          src={img.url}
+                          alt={img.productNameAr || img.productName}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                      </button>
+                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2">
+                        <p className="text-xs text-white truncate">
+                          {img.productNameAr || img.productName}
+                        </p>
+                        <div className="flex items-center justify-between mt-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 bg-white/90 hover:bg-white text-foreground"
+                            onClick={() => setPreviewUrl(img.url)}
+                            title="معاينة"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            onClick={() => setSelectedProduct({ productId: img.productId, url: img.url })}
+                            title="حذف الصورة"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 text-muted-foreground">
+                  <ShoppingBag className="h-10 w-10 mx-auto mb-3 opacity-40" />
+                  <p>لا توجد صور منتجات</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="gallery">
+          <Card>
+            <CardContent className="pt-6">
+              {loadingGallery ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              ) : galleryImages && galleryImages.length > 0 ? (
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+                  {galleryImages.map(img => (
+                    <div key={img.galleryId} className="group relative rounded-lg border overflow-hidden bg-muted">
+                      <button
+                        type="button"
+                        onClick={() => setPreviewUrl(img.url)}
+                        className="w-full aspect-square"
+                        title="معاينة"
+                      >
+                        <img
+                          src={img.url}
+                          alt={img.title}
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                        />
+                      </button>
+                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2">
+                        <p className="text-xs text-white truncate">{img.title}</p>
+                        <div className="flex items-center justify-between mt-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 bg-white/90 hover:bg-white text-foreground"
+                            onClick={() => setPreviewUrl(img.url)}
+                            title="معاينة"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            onClick={() => setDeleteGalleryId(img.galleryId)}
+                            title="حذف الصورة"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 text-muted-foreground">
+                  <Images className="h-10 w-10 mx-auto mb-3 opacity-40" />
+                  <p>لا توجد صور في المعرض</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Preview dialog */}
+      <AlertDialog open={previewUrl !== null} onOpenChange={open => !open && setPreviewUrl(null)}>
+        <AlertDialogContent className="max-w-3xl p-0 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setPreviewUrl(null)}
+            className="absolute top-2 left-2 z-10 h-8 w-8 rounded-full bg-black/60 text-white flex items-center justify-center"
+          >
+            <X className="h-4 w-4" />
+          </button>
+          {previewUrl && (
+            <img src={previewUrl} alt="معاينة" className="w-full h-auto max-h-[80vh] object-contain" />
+          )}
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete confirm dialogs */}
+      <AlertDialog open={selectedProduct !== null} onOpenChange={open => !open && setSelectedProduct(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>حذف صورة المنتج</AlertDialogTitle>
+            <AlertDialogDescription>
+              هل أنت متأكد من حذف هذه الصورة؟ لن تظهر في صفحة المنتج ولا في البطاقات.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => selectedProduct && removeProductMutation.mutate(selectedProduct)}
+            >
+              حذف
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={deleteGalleryId !== null} onOpenChange={open => !open && setDeleteGalleryId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>حذف صورة من المعرض</AlertDialogTitle>
+            <AlertDialogDescription>
+              هل أنت متأكد من حذف هذه الصورة من معرض الأعمال؟
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteGalleryId !== null && removeGalleryMutation.mutate({ galleryId: deleteGalleryId })}
+            >
+              حذف
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   );
 }

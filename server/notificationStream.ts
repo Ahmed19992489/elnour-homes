@@ -1,36 +1,32 @@
 import type { Request, Response } from "express";
 
-const clients = new Map<number, Set<Response>>();
+const streamsByUser = new Map<number, Set<Response>>();
 
+/** Opens a same-origin, authenticated SSE stream for one customer's account. */
 export function openAccountNotificationStream(req: Request, res: Response, userId: number) {
-  res.writeHead(200, {
-    "Content-Type": "text/event-stream",
-    "Cache-Control": "no-cache",
-    Connection: "keep-alive",
-  });
+  res.status(200);
+  res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders();
+  res.write("retry: 3000\n\n");
 
-  if (!clients.has(userId)) {
-    clients.set(userId, new Set());
-  }
-  clients.get(userId)!.add(res);
-
-  res.write(`data: ${JSON.stringify({ type: "connected" })}\n\n`);
+  const userStreams = streamsByUser.get(userId) || new Set<Response>();
+  userStreams.add(res);
+  streamsByUser.set(userId, userStreams);
 
   req.on("close", () => {
-    const userClients = clients.get(userId);
-    if (userClients) {
-      userClients.delete(res);
-      if (userClients.size === 0) {
-        clients.delete(userId);
-      }
-    }
+    userStreams.delete(res);
+    if (!userStreams.size) streamsByUser.delete(userId);
   });
 }
 
-export function broadcastNotification(userId: number, payload: any) {
-  const userClients = clients.get(userId);
-  if (userClients) {
-    const data = `data: ${JSON.stringify(payload)}\n\n`;
-    userClients.forEach((res) => res.write(data));
+/** Signals connected customer-account tabs to refetch their authoritative notification list. */
+export function publishAccountNotification(userId: number) {
+  const streams = streamsByUser.get(userId);
+  if (!streams?.size) return;
+  for (const stream of Array.from(streams)) {
+    stream.write("event: order_notification\ndata: {}\n\n");
   }
 }

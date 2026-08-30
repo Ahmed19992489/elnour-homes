@@ -1,91 +1,201 @@
-import React, { useState, useEffect } from "react";
-import DashboardLayout from "@/components/DashboardLayout";
+import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Save } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Loader2, Save, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 
-export default function AdminContent() {
-  const { data: contentList, isLoading, refetch } = trpc.content.list.useQuery();
+type SectionContent = {
+  id: number;
+  sectionKey: string;
+  titleAr: string | null;
+  titleEn: string | null;
+  contentAr: string | null;
+  contentEn: string | null;
+  subtitleAr: string | null;
+  subtitleEn: string | null;
+};
 
-  const [heroTitleAr, setHeroTitleAr] = useState("أرقى ديكورات وأعمال الاستيل الفاخرة");
-  const [heroSubtitleAr, setHeroSubtitleAr] = useState("تصميم وتصنيع ترابيزات، مرايات، قواطع، وتجهيزات استانلس 304 بأعلى دقة.");
-  const [aboutStoryAr, setAboutStoryAr] = useState("نحن في Elnour Homes نجمع بين دقة الهندسة وجمال الفن العصري لنقدم لك قطع ديكور استانلس تعيش معك عمراً كاملاً.");
+const sectionLabels: Record<string, { ar: string; en: string }> = {
+  hero: { ar: "الصفحة الرئيسية (الهيرو)", en: "Home Page (Hero)" },
+  about: { ar: "من نحن", en: "About Us" },
+  story: { ar: "قصتنا وتاريخنا", en: "Our Story & History" },
+  work: { ar: "أعمالنا", en: "Our Work" },
+};
+
+export default function AdminContent() {
+  const utils = trpc.useUtils();
+  const { data: contentList, isLoading } = trpc.siteContent.list.useQuery();
+  const updateMutation = trpc.siteContent.update.useMutation({
+    onSuccess: () => {
+      utils.siteContent.list.invalidate();
+      toast.success("تم حفظ التعديلات بنجاح");
+    },
+    onError: (error) => {
+      toast.error("فشل في حفظ التعديلات: " + error.message);
+    },
+  });
+
+  const [activeSection, setActiveSection] = useState("about");
+  const [formData, setFormData] = useState({
+    titleAr: "", titleEn: "", contentAr: "", contentEn: "",
+    subtitleAr: "", subtitleEn: "",
+  });
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     if (contentList) {
-      const cMap: Record<string, string> = {};
-      contentList.forEach((c: any) => {
-        cMap[c.key] = c.value;
+      const section = contentList.find(c => c.sectionKey === activeSection);
+      setFormData(section ? {
+        titleAr: section.titleAr || "",
+        titleEn: section.titleEn || "",
+        contentAr: section.contentAr || "",
+        contentEn: section.contentEn || "",
+        subtitleAr: section.subtitleAr || "",
+        subtitleEn: section.subtitleEn || "",
+      } : {
+        titleAr: "", titleEn: "", contentAr: "", contentEn: "", subtitleAr: "", subtitleEn: "",
       });
-      if (cMap["hero_title_ar"]) setHeroTitleAr(cMap["hero_title_ar"]);
-      if (cMap["hero_subtitle_ar"]) setHeroSubtitleAr(cMap["hero_subtitle_ar"]);
-      if (cMap["about_story_ar"]) setAboutStoryAr(cMap["about_story_ar"]);
     }
-  }, [contentList]);
+  }, [contentList, activeSection]);
 
-  const updateContent = trpc.content.update.useMutation({
-    onSuccess: () => {
-      toast.success("تم تحديث نصوص المتجر بنجاح");
-      void refetch();
-    },
-    onError: (e) => toast.error(e.message),
-  });
-
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
-    updateContent.mutate({
-      items: [
-        { key: "hero_title_ar", value: heroTitleAr },
-        { key: "hero_subtitle_ar", value: heroSubtitleAr },
-        { key: "about_story_ar", value: aboutStoryAr },
-      ],
+  const handleSave = () => {
+    updateMutation.mutate({
+      sectionKey: activeSection,
+      ...formData,
     });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
   };
 
-  return (
-    <DashboardLayout>
-      <div className="space-y-6 max-w-4xl">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[#24211d]">إدارة محتوى ونصوص المتجر</h1>
-          <p className="text-sm text-muted-foreground mt-1">تعديل نصوص الصفحة الرئيسية وقسم من نحن والبانرات الترويجية.</p>
-        </div>
-
-        <form onSubmit={handleSave} className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>البانر الرئيسي (Hero Section)</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <label className="text-xs font-bold block mb-1.5">العنوان الرئيسي</label>
-                <Input value={heroTitleAr} onChange={(e) => setHeroTitleAr(e.target.value)} required />
-              </div>
-              <div>
-                <label className="text-xs font-bold block mb-1.5">العنوان الفرعي / الوصف</label>
-                <Textarea value={heroSubtitleAr} onChange={(e) => setHeroSubtitleAr(e.target.value)} rows={2} required />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>نبذة من نحن وقصة المصنع</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Textarea value={aboutStoryAr} onChange={(e) => setAboutStoryAr(e.target.value)} rows={4} required />
-            </CardContent>
-          </Card>
-
-          <Button type="submit" disabled={updateContent.isPending} className="bg-[#24211d] text-white hover:bg-[#d5af58] hover:text-[#24211d] font-bold px-8 h-12 rounded-xl">
-            <Save className="ml-2 h-4 w-4" />
-            {updateContent.isPending ? "جاري الحفظ..." : "حفظ النصوص"}
-          </Button>
-        </form>
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
-    </DashboardLayout>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold">محتوى الموقع</h1>
+        <p className="text-muted-foreground mt-1">
+          عدّل محتوى الصفحات العامة: الرئيسية، من نحن، قصتنا، وأعمالنا.
+        </p>
+      </div>
+
+      {/* Section Tabs */}
+      <Tabs value={activeSection} onValueChange={setActiveSection}>
+        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 md:grid-cols-4">
+          {Object.entries(sectionLabels).map(([key, labels]) => (
+            <TabsTrigger key={key} value={key} className="text-sm">
+              {labels.ar}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+
+        {Object.entries(sectionLabels).map(([key, labels]) => (
+          <TabsContent key={key} value={key}>
+            <Card>
+              <CardHeader>
+                <CardTitle>{labels.ar} - {labels.en}</CardTitle>
+                <CardDescription>
+                  عدّل المحتوى بالعربي والإنجليزي. المحتوى العربي يظهر عندما يكون الموقع بالعربي، والإنجليزي عند التبديل للإنجليزية.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Arabic Content */}
+                <div className="space-y-4 border rounded-lg p-4 bg-blue-50/50">
+                  <h3 className="font-semibold text-blue-800">المحتوى بالعربي 🇪🇬</h3>
+                  
+                  <div className="space-y-2">
+                    <Label>العنوان العربي</Label>
+                    <Input
+                      value={formData.titleAr}
+                      onChange={(e) => setFormData(prev => ({ ...prev, titleAr: e.target.value }))}
+                      placeholder="مثال: من نحن"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>العنوان الفرعي العربي</Label>
+                    <Input
+                      value={formData.subtitleAr}
+                      onChange={(e) => setFormData(prev => ({ ...prev, subtitleAr: e.target.value }))}
+                      placeholder="مثال: خبرة واحترافية"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>المحتوى العربي</Label>
+                    <Textarea
+                      value={formData.contentAr}
+                      onChange={(e) => setFormData(prev => ({ ...prev, contentAr: e.target.value }))}
+                      placeholder="اكتب محتوى القسم هنا..."
+                      rows={5}
+                    />
+                  </div>
+                </div>
+
+                {/* English Content */}
+                <div className="space-y-4 border rounded-lg p-4 bg-green-50/50">
+                  <h3 className="font-semibold text-green-800">المحتوى بالإنجليزية 🇺🇸</h3>
+                  
+                  <div className="space-y-2">
+                    <Label>English Title</Label>
+                    <Input
+                      value={formData.titleEn}
+                      onChange={(e) => setFormData(prev => ({ ...prev, titleEn: e.target.value }))}
+                      placeholder="e.g., About Us"
+                      dir="ltr"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>English Subtitle</Label>
+                    <Input
+                      value={formData.subtitleEn}
+                      onChange={(e) => setFormData(prev => ({ ...prev, subtitleEn: e.target.value }))}
+                      placeholder="e.g., Expertise & Professionalism"
+                      dir="ltr"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>English Content</Label>
+                    <Textarea
+                      value={formData.contentEn}
+                      onChange={(e) => setFormData(prev => ({ ...prev, contentEn: e.target.value }))}
+                      placeholder="Write the section content here..."
+                      rows={5}
+                      dir="ltr"
+                    />
+                  </div>
+                </div>
+
+                {/* Save Button */}
+                <div className="flex items-center gap-3">
+                  <Button onClick={handleSave} disabled={updateMutation.isPending} className="gap-2">
+                    {updateMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : saved ? (
+                      <CheckCircle className="h-4 w-4" />
+                    ) : (
+                      <Save className="h-4 w-4" />
+                    )}
+                    {updateMutation.isPending ? "جاري الحفظ..." : saved ? "تم الحفظ" : "حفظ التعديلات"}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        ))}
+      </Tabs>
+    </div>
   );
 }

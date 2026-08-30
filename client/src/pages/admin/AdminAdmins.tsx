@@ -1,166 +1,358 @@
-import React, { useState } from "react";
-import DashboardLayout from "@/components/DashboardLayout";
+import { useEffect, useMemo, useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Loader2, Plus, ShieldCheck, KeyRound, Trash2 } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Loader2, Plus, KeyRound, Power, PowerOff, Trash2, ShieldAlert, ShieldCheck, Eye, EyeOff } from "lucide-react";
 import { toast } from "sonner";
+import { useLocation } from "wouter";
+
+type AdminAccount = {
+  id: number;
+  phone: string;
+  displayName: string;
+  isActive: boolean;
+  createdAt: number;
+};
 
 export default function AdminAdmins() {
+  const [, setLocation] = useLocation();
   const { data: accounts, isLoading, refetch } = trpc.adminAccounts.list.useQuery();
+  const { data: meData } = trpc.adminAuth.me.useQuery(undefined, { retry: false });
+  const isOwner = meData?.isOwner === true;
+
   const [addOpen, setAddOpen] = useState(false);
+  const [pwOpen, setPwOpen] = useState<string | null>(null);
+  const [removeTarget, setRemoveTarget] = useState<string | null>(null);
 
-  const [form, setForm] = useState<{
-    phone: string;
-    displayName: string;
-    password: string;
-    role: "admin" | "moderator";
-  }>({
-    phone: "",
-    displayName: "",
-    password: "",
-    role: "moderator",
-  });
+  const [form, setForm] = useState({ phone: "", displayName: "", password: "" });
+  const [pwForm, setPwForm] = useState({ password: "" });
+  const [showPw, setShowPw] = useState(false);
+  const [showAddPw, setShowAddPw] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [savingPw, setSavingPw] = useState(false);
 
-  const createAccount = trpc.adminAccounts.create.useMutation({
-    onSuccess: () => {
-      toast.success("تم إنشاء الحساب بنجاح");
-      setAddOpen(false);
-      setForm({ phone: "", displayName: "", password: "", role: "moderator" });
-      void refetch();
-    },
-    onError: (e) => toast.error(e.message),
-  });
-
-  const removeAccount = trpc.adminAccounts.remove.useMutation({
-    onSuccess: () => {
-      toast.success("تم حذف الحساب");
-      void refetch();
-    },
-    onError: (e) => toast.error(e.message),
-  });
-
-  const handleAdd = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!form.phone.trim() || !form.password.trim()) {
-      toast.error("يرجى إدخال رقم الهاتف وكلمة المرور");
-      return;
+  useEffect(() => {
+    if (meData && !isOwner) {
+      toast.error("إدارة حسابات المدراء متاحة لمالك الموقع فقط");
+      setLocation("/admin");
     }
-    createAccount.mutate(form);
+  }, [meData, isOwner, setLocation]);
+
+  const createMutation = trpc.adminAccounts.create.useMutation({
+    onSuccess: () => {
+      setAddOpen(false);
+      setForm({ phone: "", displayName: "", password: "" });
+      void refetch();
+      toast.success("تمت إضافة حساب المدير بنجاح");
+    },
+    onError: (error) => toast.error(String(error.message)),
+    onSettled: () => setAdding(false),
+  });
+
+  const pwMutation = trpc.adminAccounts.updatePassword.useMutation({
+    onSuccess: () => {
+      setPwOpen(null);
+      setPwForm({ password: "" });
+      toast.success("تم تغيير كلمة المرور بنجاح");
+    },
+    onError: (error) => toast.error(String(error.message)),
+    onSettled: () => setSavingPw(false),
+  });
+
+  const toggleMutation = trpc.adminAccounts.deactivate.useMutation({
+    onSuccess: () => {
+      void refetch();
+      toast.success("تم تعطيل الحساب — سيتم تسجيل خروجه من جميع الأجهزة");
+    },
+    onError: (error) => toast.error(String(error.message)),
+  });
+  const activateMutation = trpc.adminAccounts.activate.useMutation({
+    onSuccess: () => {
+      void refetch();
+      toast.success("تم تفعيل الحساب");
+    },
+    onError: (error) => toast.error(String(error.message)),
+  });
+
+  const removeMutation = trpc.adminAccounts.remove.useMutation({
+    onSuccess: () => {
+      setRemoveTarget(null);
+      void refetch();
+      toast.success("تم حذف الحساب نهائيًا");
+    },
+    onError: (error) => toast.error(String(error.message)),
+  });
+
+  const handleAdd = () => {
+    setAdding(true);
+    createMutation.mutate({
+      phone: form.phone,
+      password: form.password,
+      displayName: form.displayName,
+    });
   };
 
-  return (
-    <DashboardLayout>
-      <div className="space-y-6 max-w-5xl">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-[#24211d]">حسابات الإدارة والمشرفين</h1>
-            <p className="text-sm text-muted-foreground mt-1">إدارة مستخدمي لوحة التحكم وصلاحيات المدراء والمشرفين (Moderators).</p>
-          </div>
-          <Button onClick={() => setAddOpen(true)} className="bg-[#24211d] text-white hover:bg-[#d5af58] hover:text-[#24211d] font-bold rounded-xl">
-            <Plus className="ml-1.5 h-4 w-4" />
-            إضافة حساب جديد
-          </Button>
-        </div>
+  const handlePwSave = () => {
+    if (!pwOpen) return;
+    setSavingPw(true);
+    pwMutation.mutate({ phone: pwOpen, password: pwForm.password });
+  };
 
-        <Card>
-          <CardHeader>
-            <CardTitle>الحسابات المصرح لها ({accounts?.length || 0})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="flex justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-[#d5af58]" />
-              </div>
-            ) : accounts && accounts.length > 0 ? (
+  const sorted = useMemo(() => {
+    if (!accounts) return [];
+    return [...accounts].sort((a, b) => b.id - a.id);
+  }, [accounts]);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">حسابات المدراء</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            إدارة أرقام الدخول إلى لوحة التحكم — إضافة، تعطيل أو حذف. الحسابات المعطّلة لا يمكنها الدخول ويُسجّل خروجها تلقائيًا من جميع الأجهزة.
+          </p>
+        </div>
+        <Button
+          className="shadow-lg hover:shadow-xl transition-all"
+          onClick={() => setAddOpen(true)}
+          disabled={!isOwner}
+        >
+          <Plus className="ml-1 h-4 w-4" />
+          إضافة حساب مدير
+        </Button>
+      </div>
+
+      {!isOwner ? (
+        <Card className="border-amber-500/40 bg-amber-50 dark:bg-amber-950/20">
+          <CardContent className="flex items-center gap-3 py-4">
+            <ShieldAlert className="h-5 w-5 text-amber-600 shrink-0" />
+            <p className="text-sm text-amber-700 dark:text-amber-400">
+              هذه الصفحة متاحة لمالك الموقع فقط.
+            </p>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">قائمة الحسابات</CardTitle>
+          <CardDescription>جميع الأرقام المسجلة للدخول إلى الإدارة</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-10">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : !sorted.length ? (
+            <p className="text-sm text-muted-foreground py-10 text-center">لا توجد حسابات مدراء مسجلة.</p>
+          ) : (
+            <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>الاسم</TableHead>
                     <TableHead>رقم الهاتف</TableHead>
-                    <TableHead>الدور والصلاحية</TableHead>
                     <TableHead>الحالة</TableHead>
-                    <TableHead className="text-left">الإجراءات</TableHead>
+                    <TableHead>تاريخ الإضافة</TableHead>
+                    <TableHead className="text-left">إجراءات</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {accounts.map((acc: any) => (
-                    <TableRow key={acc.phone}>
-                      <TableCell className="font-bold">{acc.displayName || acc.phone}</TableCell>
-                      <TableCell dir="ltr" className="font-mono text-xs">{acc.phone}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={acc.role === "admin" ? "bg-amber-50 text-amber-800 border-amber-300 font-bold" : "bg-blue-50 text-blue-800 border-blue-300"}>
-                          {acc.role === "admin" ? "مدير عام (Admin)" : "مشرف / موظف (Moderator)"}
-                        </Badge>
+                  {sorted.map((account) => (
+                    <TableRow key={account.id}>
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          {account.displayName}
+                          {isOwner ? (
+                            account.isActive ? (
+                              <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                            ) : (
+                              <ShieldAlert className="h-4 w-4 text-amber-600" />
+                            )
+                          ) : null}
+                        </div>
+                      </TableCell>
+                      <TableCell dir="ltr" className="text-right font-mono text-sm">
+                        {account.phone}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className={acc.isActive ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}>
-                          {acc.isActive ? "نشط" : "معطل"}
+                        <Badge variant={account.isActive ? "outline" : "secondary"} className={account.isActive ? "border-emerald-600 text-emerald-700" : ""}>
+                          {account.isActive ? "نشط" : "معطّل"}
                         </Badge>
                       </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {new Date(account.createdAt).toLocaleDateString("ar-EG")}
+                      </TableCell>
                       <TableCell>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => removeAccount.mutate({ phone: acc.phone })}
-                          title="حذف الحساب"
-                        >
-                          <Trash2 className="h-4 w-4 text-red-600" />
-                        </Button>
+                        <div className="flex items-center gap-1.5" dir="ltr">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            title="تغيير كلمة المرور"
+                            onClick={() => {
+                              setPwOpen(account.phone);
+                              setPwForm({ password: "" });
+                            }}
+                          >
+                            <KeyRound className="h-4 w-4" />
+                          </Button>
+                          {account.isActive ? (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              title="تعطيل الحساب"
+                              onClick={() => toggleMutation.mutate({ phone: account.phone })}
+                            >
+                              <PowerOff className="h-4 w-4 text-amber-600" />
+                            </Button>
+                          ) : (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              title="تفعيل الحساب"
+                              onClick={() => activateMutation.mutate({ phone: account.phone })}
+                            >
+                              <Power className="h-4 w-4 text-emerald-600" />
+                            </Button>
+                          )}
+                          {isOwner ? (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              title="حذف الحساب نهائيًا"
+                              onClick={() => setRemoveTarget(account.phone)}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-600" />
+                            </Button>
+                          ) : null}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
-            ) : (
-              <p className="text-center py-8 text-muted-foreground">لا توجد حسابات مسجلة.</p>
-            )}
-          </CardContent>
-        </Card>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
-        {/* Add Dialog */}
-        <Dialog open={addOpen} onOpenChange={setAddOpen}>
-          <DialogContent dir="rtl">
-            <DialogHeader>
-              <DialogTitle>إضافة حساب إدارة / موظف جديد</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleAdd} className="space-y-4 pt-2">
-              <div>
-                <label className="text-xs font-bold block mb-1">الاسم أو المسمى الوظيفي *</label>
-                <Input value={form.displayName} onChange={(e) => setForm({ ...form, displayName: e.target.value })} placeholder="مثال: Moderator / موظف المبيعات" required />
-              </div>
-              <div>
-                <label className="text-xs font-bold block mb-1">رقم الهاتف للدخول *</label>
-                <Input dir="ltr" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="01118182424" required />
-              </div>
-              <div>
-                <label className="text-xs font-bold block mb-1">كلمة المرور *</label>
-                <Input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="••••••••" required />
-              </div>
-              <div>
-                <label className="text-xs font-bold block mb-1">نوع الصلاحية *</label>
-                <select
-                  value={form.role}
-                  onChange={(e) => setForm({ ...form, role: e.target.value as any })}
-                  className="w-full rounded-xl border border-input p-2.5 text-sm font-bold"
+      {/* Add account dialog */}
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent className="sm:max-w-md" dir="rtl">
+          <DialogHeader>
+            <DialogTitle>إضافة حساب مدير جديد</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>رقم الهاتف</Label>
+              <Input
+                dir="ltr"
+                placeholder="01112345678"
+                value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+              />
+              <p className="text-xs text-muted-foreground">رقم مصري من 11 رقمًا يبدأ بـ 01.</p>
+            </div>
+            <div className="space-y-2">
+              <Label>اسم العرض</Label>
+              <Input
+                placeholder="مثال: مشرف المبيعات"
+                value={form.displayName}
+                onChange={(e) => setForm({ ...form, displayName: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>كلمة المرور</Label>
+              <div className="relative">
+                <Input
+                  type={showAddPw ? "text" : "password"}
+                  value={form.password}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setForm({ ...form, password: e.target.value })}
+                  placeholder="8 أحرف على الأقل"
+                />
+                <button
+                  type="button"
+                  className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowAddPw((v) => !v)}
+                  aria-label={showAddPw ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
                 >
-                  <option value="moderator">مشرف / موظف (Moderator) - متابعة الطلبات والكتالوج</option>
-                  <option value="admin">مدير عام (Admin) - كامل الصلاحيات والتقارير</option>
-                </select>
+                  {showAddPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
-              <DialogFooter className="pt-4">
-                <Button type="submit" disabled={createAccount.isPending} className="w-full bg-[#24211d] text-white hover:bg-[#d5af58] hover:text-[#24211d] font-bold">
-                  {createAccount.isPending ? "جاري الإنشاء..." : "إنشاء الحساب"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
-    </DashboardLayout>
+            </div>
+            <Button className="w-full" onClick={handleAdd} disabled={adding}>
+              {adding ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Plus className="ml-2 h-4 w-4" />}
+              إضافة الحساب
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Password dialog */}
+      <Dialog open={pwOpen !== null} onOpenChange={(open) => !open && setPwOpen(null)}>
+        <DialogContent className="sm:max-w-md" dir="rtl">
+          <DialogHeader>
+            <DialogTitle>تغيير كلمة المرور</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground" dir="ltr">
+              الرقم: <span className="font-mono">{pwOpen}</span>
+            </p>
+            <div className="space-y-2">
+              <Label>كلمة المرور الجديدة</Label>
+              <div className="relative">
+                <Input
+                  type={showPw ? "text" : "password"}
+                  value={pwForm.password}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPwForm({ ...pwForm, password: e.target.value })}
+                  placeholder="8 أحرف على الأقل"
+                />
+                <button
+                  type="button"
+                  className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  onClick={() => setShowPw((v) => !v)}
+                  aria-label={showPw ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
+                >
+                  {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+            <Button className="w-full" onClick={handlePwSave} disabled={savingPw}>
+              {savingPw ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <KeyRound className="ml-2 h-4 w-4" />}
+              حفظ كلمة المرور
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Remove confirmation */}
+      <AlertDialog open={removeTarget !== null} onOpenChange={(open) => !open && setRemoveTarget(null)}>
+        <AlertDialogContent dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>حذف الحساب نهائيًا؟</AlertDialogTitle>
+            <AlertDialogDescription>
+              سيتم حذف هذا الحساب من قائمة المدراء بالكامل ولن يتمكن صاحبه من الدخول مرة أخرى. لا يمكن التراجع عن هذا الإجراء.
+              <span dir="ltr" className="block font-mono mt-2 text-sm">{removeTarget}</span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => removeTarget && removeMutation.mutate({ phone: removeTarget })}
+            >
+              نعم، احذف الحساب
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   );
 }

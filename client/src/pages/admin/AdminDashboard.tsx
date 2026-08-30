@@ -1,202 +1,182 @@
-import React from "react";
-import { Link } from "wouter";
 import DashboardLayout from "@/components/DashboardLayout";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
-import { formatPrice, formatDate } from "@/lib/utils";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ShoppingBag, Users, TrendingUp, Package, BarChart3, Eye, ArrowUpRight } from "lucide-react";
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  ShoppingBag,
-  Clock,
-  Truck,
-  CheckCircle2,
-  Package,
-  Layers,
-  ArrowLeft,
-  Loader2,
-  Users,
-  Eye,
-  MessageCircle,
-} from "lucide-react";
 
 export default function AdminDashboard() {
   const { user, isAuthenticated } = useAuth();
-  const { data: stats, isLoading: statsLoading } = trpc.orders.stats.useQuery();
-  const { data: orders, isLoading: ordersLoading } = trpc.orders.list.useQuery();
 
-  const totalOrders =
-    (stats?.new || 0) +
-    (stats?.contacted || 0) +
-    (stats?.confirmed || 0) +
-    (stats?.shipped || 0) +
-    (stats?.delivered || 0) +
-    (stats?.cancelled || 0);
+  const { data: stats, isLoading } = trpc.orders.stats.useQuery();
+  const { data: newCount } = trpc.orders.newCount.useQuery();
 
-  const recentOrders = orders?.slice(0, 5) || [];
+  if (!isAuthenticated) {
+    return <div className="p-8 text-center">يرجى تسجيل الدخول للوصول إلى لوحة التحكم</div>;
+  }
+
+  if (user?.role !== 'admin') {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center p-8 text-center">
+        <h1 className="text-xl font-bold">هذه الصفحة للإدارة فقط</h1>
+        <p className="mt-2 max-w-md text-muted-foreground">
+          يبدو أنك عميل لدى Elnour for STEEL — يمكنك متابعة طلباتك وتحديث بياناتك من صفحة حسابك.
+        </p>
+        <Button className="mt-6 bg-[#26231e] text-white hover:bg-[#ad842f]" onClick={() => window.location.assign("/account")}>
+          فتح حسابي
+        </Button>
+      </div>
+    );
+  }
+
+  const totalOrders = stats?.total ?? 0;
+  const conversionRate = stats?.conversionRate ? stats.conversionRate.toFixed(2) : "0.00";
+  const visitorCount = stats?.uniqueVisitors ?? 0;
+  const pageviewCount = stats?.pageviews ?? 0;
+  const todayVisitors = stats?.todayVisitors ?? 0;
+
+  const cards = [
+    {
+      title: "إجمالي الطلبات",
+      value: totalOrders,
+      icon: ShoppingBag,
+      color: "text-amber-600",
+      bg: "bg-amber-50",
+    },
+    {
+      title: "طلبات جديدة",
+      value: newCount ?? 0,
+      icon: Users,
+      color: "text-green-600",
+      bg: "bg-green-50",
+    },
+    {
+      title: "نسبة التحويل",
+      value: `${conversionRate}%`,
+      subtitle: visitorCount > 0 ? `${pageviewCount} مشاهدة / ${visitorCount} زائر` : "لا توجد بيانات بعد",
+      icon: BarChart3,
+      color: "text-purple-600",
+      bg: "bg-purple-50",
+    },
+    {
+      title: "تم التوصيل",
+      value: stats?.delivered ?? 0,
+      icon: Package,
+      color: "text-blue-600",
+      bg: "bg-blue-50",
+    },
+  ];
 
   return (
     <DashboardLayout>
-      <div className="space-y-8">
-        {/* Welcome Banner */}
-        <div className="rounded-3xl bg-[#24211d] text-[#f8f5ee] p-6 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-lg">
-          <div className="space-y-1.5">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-[#d5af58] uppercase tracking-wider">
-                لوحة المتابعة والتحكم
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold">لوحة التحكم</h1>
+          {stats && (
+            <div className="flex items-center gap-4 text-sm">
+              <span className="flex items-center gap-1 text-muted-foreground">
+                <Eye className="h-4 w-4" />
+                {pageviewCount} مشاهدة
               </span>
-              <Badge variant="gold" className="text-[10px] px-2 py-0.5">
-                {user?.role === "admin" ? "مدير النظام (Owner/Admin)" : "موظف المتجر (Moderator)"}
-              </Badge>
+              <span className="flex items-center gap-1 text-muted-foreground">
+                <Users className="h-4 w-4" />
+                {visitorCount} زائر
+              </span>
+              <span className="flex items-center gap-1 text-muted-foreground">
+                <ArrowUpRight className="h-4 w-4" />
+                {todayVisitors} اليوم
+              </span>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black">
-              أهلاً بك، {user?.name || (user?.role === "admin" ? "المدير العام" : "الموظف")}
-            </h1>
-            <p className="text-xs text-[#b8b0a2]">
-              متابعة طلبات واستفسارات متجر Elnour Homes فورياً.
-            </p>
+          )}
+        </div>
+
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-muted-foreground">جاري التحميل...</div>
           </div>
-
-          <Link href="/admin/orders">
-            <Button className="bg-[#d5af58] text-[#24211d] hover:bg-[#e0be6c] font-black rounded-xl text-sm">
-              <ShoppingBag className="ml-2 h-4 w-4" />
-              عرض كافة الطلبات
-            </Button>
-          </Link>
-        </div>
-
-        {/* Metric KPI Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-xs font-bold text-muted-foreground">إجمالي الطلبات</CardTitle>
-              <ShoppingBag className="h-4 w-4 text-[#a8822d]" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-black text-[#24211d]">{totalOrders}</div>
-              <p className="text-[11px] text-muted-foreground mt-1">كافة الحجوزات المسجلة</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-xs font-bold text-muted-foreground">طلبات جديدة بانتظار التواصل</CardTitle>
-              <Clock className="h-4 w-4 text-blue-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-black text-blue-700">{stats?.new || 0}</div>
-              <p className="text-[11px] text-muted-foreground mt-1">تحتاج لتواصل سريع</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-xs font-bold text-muted-foreground">جاري التجهيز والشحن</CardTitle>
-              <Truck className="h-4 w-4 text-purple-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-black text-purple-700">{(stats?.confirmed || 0) + (stats?.shipped || 0)}</div>
-              <p className="text-[11px] text-muted-foreground mt-1">قيد التصنيع والتسليم</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-xs font-bold text-muted-foreground">تم التسليم بنجاح</CardTitle>
-              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-black text-emerald-700">{stats?.delivered || 0}</div>
-              <p className="text-[11px] text-muted-foreground mt-1">طلبات مكتملة</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Quick Shortcuts */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <Link href="/admin/products" className="group">
-            <div className="p-4 rounded-2xl border border-[#e8e2d8] bg-white hover:border-[#d5af58] hover:shadow-md transition-all text-center">
-              <Package className="h-6 w-6 mx-auto text-[#a8822d] group-hover:scale-110 transition-transform" />
-              <span className="font-bold text-xs text-[#24211d] mt-2 block">إدارة المنتجات</span>
+        ) : (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {cards.map((card) => (
+                <Card key={card.title}>
+                  <CardContent className="p-6">
+                    <div className="flex items-center gap-4">
+                      <div className={`p-3 rounded-xl ${card.bg}`}>
+                        <card.icon className={`h-6 w-6 ${card.color}`} />
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">{card.title}</p>
+                        <p className="text-2xl font-bold">{card.value}</p>
+                        {card.subtitle && (
+                          <p className="text-xs text-muted-foreground mt-1">{card.subtitle}</p>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
-          </Link>
 
-          <Link href="/admin/categories" className="group">
-            <div className="p-4 rounded-2xl border border-[#e8e2d8] bg-white hover:border-[#d5af58] hover:shadow-md transition-all text-center">
-              <Layers className="h-6 w-6 mx-auto text-[#a8822d] group-hover:scale-110 transition-transform" />
-              <span className="font-bold text-xs text-[#24211d] mt-2 block">إدارة الأقسام</span>
-            </div>
-          </Link>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">إحصائيات الطلبات</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
+                      <span className="text-green-700">طلبات جديدة</span>
+                      <span className="font-bold text-green-800">{stats?.new ?? 0}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
+                      <span className="text-blue-700">تم التواصل</span>
+                      <span className="font-bold text-blue-800">{stats?.contacted ?? 0}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-purple-50 rounded-lg">
+                      <span className="text-purple-700">تم التأكيد</span>
+                      <span className="font-bold text-purple-800">{stats?.confirmed ?? 0}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-amber-50 rounded-lg">
+                      <span className="text-amber-700">تم التوصيل</span>
+                      <span className="font-bold text-amber-800">{stats?.delivered ?? 0}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
+                      <span className="text-red-700">ملغية</span>
+                      <span className="font-bold text-red-800">{stats?.cancelled ?? 0}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-          <Link href="/admin/gallery" className="group">
-            <div className="p-4 rounded-2xl border border-[#e8e2d8] bg-white hover:border-[#d5af58] hover:shadow-md transition-all text-center">
-              <Eye className="h-6 w-6 mx-auto text-[#a8822d] group-hover:scale-110 transition-transform" />
-              <span className="font-bold text-xs text-[#24211d] mt-2 block">معرض الأعمال</span>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">روابط سريعة</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Link href="/admin/orders">
+                    <Button variant="outline" className="w-full justify-start text-right" size="lg">
+                      <ShoppingBag className="ml-2 h-5 w-5" />
+                      إدارة الطلبات
+                    </Button>
+                  </Link>
+                  <Link href="/admin/products">
+                    <Button variant="outline" className="w-full justify-start text-right" size="lg">
+                      <Package className="ml-2 h-5 w-5" />
+                      إدارة المنتجات
+                    </Button>
+                  </Link>
+                  <Link href="/admin/gallery">
+                    <Button variant="outline" className="w-full justify-start text-right" size="lg">
+                      <BarChart3 className="ml-2 h-5 w-5" />
+                      معرض الأعمال
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
             </div>
-          </Link>
-
-          <Link href="/admin/coupons" className="group">
-            <div className="p-4 rounded-2xl border border-[#e8e2d8] bg-white hover:border-[#d5af58] hover:shadow-md transition-all text-center">
-              <Users className="h-6 w-6 mx-auto text-[#a8822d] group-hover:scale-110 transition-transform" />
-              <span className="font-bold text-xs text-[#24211d] mt-2 block">كوبونات الخصم</span>
-            </div>
-          </Link>
-        </div>
-
-        {/* Recent Orders Table */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>أحدث الطلبات المستلمة</CardTitle>
-              <CardDescription>آخر 5 طلبات مسجلة على المتجر</CardDescription>
-            </div>
-            <Link href="/admin/orders">
-              <Button variant="ghost" size="sm" className="text-xs font-bold text-[#a8822d]">
-                عرض الكل ←
-              </Button>
-            </Link>
-          </CardHeader>
-          <CardContent>
-            {ordersLoading ? (
-              <div className="flex justify-center py-10">
-                <Loader2 className="h-8 w-8 animate-spin text-[#d5af58]" />
-              </div>
-            ) : recentOrders.length > 0 ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>رقم الطلب</TableHead>
-                    <TableHead>اسم العميل</TableHead>
-                    <TableHead>الهاتف</TableHead>
-                    <TableHead>الإجمالي</TableHead>
-                    <TableHead>الحالة</TableHead>
-                    <TableHead>التاريخ</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {recentOrders.map((o: any) => (
-                    <TableRow key={o.id}>
-                      <TableCell className="font-bold">#{o.id}</TableCell>
-                      <TableCell>{o.customerName}</TableCell>
-                      <TableCell dir="ltr" className="text-xs">{o.customerPhone}</TableCell>
-                      <TableCell font-black dir="ltr">{formatPrice(o.totalAmount)} ج.م</TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-[11px]">
-                          {o.status === "new" ? "جديد" : o.status === "contacted" ? "تم التواصل" : o.status === "confirmed" ? "مؤكد" : o.status === "shipped" ? "جاري الشحن" : o.status === "delivered" ? "تم التوصيل" : "ملغى"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{formatDate(o.createdAt)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            ) : (
-              <p className="text-center py-8 text-muted-foreground">لا توجد طلبات جديدة حالياً.</p>
-            )}
-          </CardContent>
-        </Card>
+          </>
+        )}
       </div>
     </DashboardLayout>
   );

@@ -1,39 +1,77 @@
-import React from "react";
 import { Star } from "lucide-react";
 
-export function StarRatingDisplay({ rating = 5, total = 5, size = "sm" }: { rating?: number; total?: number; size?: "sm" | "md" | "lg" }) {
-  const iconSize = size === "lg" ? "h-6 w-6" : size === "md" ? "h-5 w-5" : "h-3.5 w-3.5";
+type StarRatingProps = {
+  /** 0-5 average (may be fractional); when provided the component is read-only. */
+  value?: number;
+  /** Number of reviews to display next to the stars. */
+  count?: number;
+};
+
+/** Read-only display of an average rating, e.g. ★ 4.5 (12) */
+export function StarRatingDisplay({ value = 0, count }: StarRatingProps) {
+  const stars = [];
+  for (let i = 1; i <= 5; i += 1) {
+    const fill = Math.min(1, Math.max(0, (value || 0) - (i - 1)));
+    stars.push(
+      <span key={i} className="relative inline-block">
+        <Star className="h-4 w-4 text-[#d8cfb8]" />
+        {fill > 0 ? (
+          <span className="absolute inset-y-0 start-0 overflow-hidden" style={{ width: `${Math.round(fill * 100)}%` }}>
+            <Star className="h-4 w-4 text-[#ad842f]" />
+          </span>
+        ) : null}
+      </span>,
+    );
+  }
   return (
-    <div className="flex items-center text-amber-500">
-      {[...Array(total)].map((_, i) => (
-        <Star
-          key={i}
-          className={`${iconSize} ${i < Math.round(rating) ? "fill-current" : "text-gray-300"}`}
-        />
-      ))}
-    </div>
+    <span className="inline-flex items-center gap-1" dir="ltr">
+      <span className="flex items-center">{stars}</span>
+      {typeof count === "number" ? (
+        <span className="text-xs text-muted-foreground">
+          ({count.toLocaleString("en-US")})
+        </span>
+      ) : null}
+    </span>
   );
 }
 
+type InteractiveRatingProps = {
+  value: number;
+  onChange: (rating: number) => void;
+  /** Optional — pass to make it read-only while keeping the interactive look. */
+  readOnly?: boolean;
+  size?: "sm" | "md";
+  labelAr?: string;
+  labelEn?: string;
+};
+
+/** Hover/click star selector used in the review form. */
 export function InteractiveRating({
   value,
   onChange,
-}: {
-  value: number;
-  onChange: (val: number) => void;
-}) {
-  return (
-    <div className="flex gap-1 text-amber-500">
-      {[1, 2, 3, 4, 5].map((star) => (
-        <button
-          type="button"
-          key={star}
-          onClick={() => onChange(star)}
-          className="p-1 hover:scale-125 transition-transform focus:outline-none"
-        >
-          <Star className={`h-6 w-6 ${star <= value ? "fill-current" : "text-gray-300"}`} />
-        </button>
-      ))}
-    </div>
-  );
+  readOnly,
+  size = "md",
+  labelAr,
+  labelEn,
+}: InteractiveRatingProps) {
+  const stars = [];
+  for (let i = 1; i <= 5; i += 1) {
+    stars.push(
+      <button
+        key={i}
+        type="button"
+        disabled={readOnly}
+        aria-label={`${labelAr ?? "تقييم"} ${i}`}
+        onClick={() => onChange(i)}
+        className="transition-transform disabled:cursor-default hover:scale-110 active:scale-95"
+      >
+        <Star
+          className={`${size === "sm" ? "h-4 w-4" : "h-6 w-6"} ${
+            i <= value ? "text-[#ad842f]" : "text-[#d8cfb8]"
+          } transition-colors`}
+        />
+      </button>,
+    );
+  }
+  return <div className="flex items-center gap-0.5" dir="ltr">{stars}</div>;
 }

@@ -1,187 +1,316 @@
-import React, { useState } from "react";
-import { Link, useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
-  LayoutDashboard,
-  ShoppingBag,
-  Package,
-  Tags,
-  Image as ImageIcon,
-  FileText,
-  Ticket,
-  Images,
-  Star,
-  BellRing,
-  BarChart3,
-  Settings2,
-  Users,
-  LogOut,
-  Sparkles,
-  Menu,
-  X,
-  ExternalLink,
-  ShieldCheck,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarTrigger,
+  useSidebar,
+} from "@/components/ui/sidebar";
+import { startLogin } from "@/const";
+import { useIsMobile } from "@/hooks/useMobile";
+import { LayoutDashboard, LogOut, PanelLeft, Users, Package, ShoppingBag, Image, FileText, Tags, Ticket, Settings2, Images, Star, BellRing, BarChart3 } from "lucide-react";
+import { trpc } from "@/lib/trpc";
+import { CSSProperties, useEffect, useRef, useState } from "react";
+import { useLocation } from "wouter";
+import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
+import { Button } from "./ui/button";
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const [location, setLocation] = useLocation();
-  const { user, isAuthenticated, loading, logout } = useAuth();
-  const [mobileOpen, setMobileOpen] = useState(false);
+const menuItems = [
+  { icon: LayoutDashboard, label: "الرئيسية", path: "/admin" },
+  { icon: ShoppingBag, label: "الطلبات", path: "/admin/orders" },
+  { icon: Package, label: "المنتجات", path: "/admin/products" },
+  { icon: Tags, label: "الفئات", path: "/admin/categories" },
+  { icon: BellRing, label: "إشعارات التوفر", path: "/admin/stock-alerts" },
+  { icon: BarChart3, label: "التقارير", path: "/admin/reports" },
+  { icon: Image, label: "المعرض", path: "/admin/gallery" },
+  { icon: FileText, label: "محتوى الموقع", path: "/admin/content" },
+  { icon: Ticket, label: "الكوبونات", path: "/admin/coupons" },
+  { icon: Images, label: "مكتبة الصور", path: "/admin/media" },
+  { icon: Star, label: "التقييمات", path: "/admin/reviews" },
+  { icon: Settings2, label: "الإعدادات", path: "/admin/settings" },
+];
 
-  const isOwnerOrAdmin = user?.role === "admin";
-  const isModerator = user?.role === "moderator";
+const SIDEBAR_WIDTH_KEY = "sidebar-width";
+const DEFAULT_WIDTH = 280;
+const MIN_WIDTH = 200;
+const MAX_WIDTH = 480;
 
-  const allMenuItems = [
-    { icon: LayoutDashboard, label: "الرئيسية والإحصائيات", path: "/admin", roles: ["admin", "moderator"] },
-    { icon: ShoppingBag, label: "إدارة الطلبات", path: "/admin/orders", roles: ["admin", "moderator"] },
-    { icon: Package, label: "المنتجات والكتالوج", path: "/admin/products", roles: ["admin", "moderator"] },
-    { icon: Tags, label: "الفئات والأقسام", path: "/admin/categories", roles: ["admin", "moderator"] },
-    { icon: ImageIcon, label: "معرض سابقة الأعمال", path: "/admin/gallery", roles: ["admin", "moderator"] },
-    { icon: BellRing, label: "إشعارات التوفر", path: "/admin/stock-alerts", roles: ["admin", "moderator"] },
-    { icon: Star, label: "تقييمات العملاء", path: "/admin/reviews", roles: ["admin", "moderator"] },
-    { icon: Ticket, label: "كوبونات الخصم", path: "/admin/coupons", roles: ["admin", "moderator"] },
-    { icon: Images, label: "مكتبة الصور والوسائط", path: "/admin/media", roles: ["admin", "moderator"] },
-    { icon: FileText, label: "محتوى ونصوص الموقع", path: "/admin/content", roles: ["admin"] },
-    { icon: BarChart3, label: "التقارير والمبيعات", path: "/admin/reports", roles: ["admin"] },
-    { icon: Settings2, label: "إعدادات المتجر", path: "/admin/settings", roles: ["admin"] },
-    { icon: Users, label: "حسابات الإدارة والمشرفين", path: "/admin/admins", roles: ["admin"] },
-  ];
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    if (typeof localStorage === "undefined") return DEFAULT_WIDTH;
+    const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
+    return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
+  });
+  const { loading, user, logout } = useAuth();
+  const [, setLocation] = useLocation();
 
-  const allowedMenuItems = allMenuItems.filter(
-    (item) => !item.roles || item.roles.includes(user?.role || "moderator")
-  );
+  useEffect(() => {
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidth.toString());
+    }
+  }, [sidebarWidth]);
 
-  return (
-    <div className="flex min-h-screen bg-[#f6f3ed]" dir="rtl">
-      {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex flex-col w-64 border-l border-[#2e2a24] bg-[#24211d] text-[#f8f5ee] sticky top-0 h-screen z-30">
-        {/* Brand */}
-        <div className="flex h-18 items-center gap-3 px-6 border-b border-[#36312a]">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#d5af58] text-[#24211d]">
-            <Sparkles className="h-5 w-5" />
+  if (loading) {
+    return <DashboardLayoutSkeleton />
+  }
+
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full">
+          <div className="flex flex-col items-center gap-6">
+            <h1 className="text-2xl font-semibold tracking-tight text-center">
+              سجل الدخول للمتابعة
+            </h1>
+            <p className="text-sm text-muted-foreground text-center max-w-sm">
+              الوصول إلى لوحة التحكم يتطلب تسجيل الدخول. اضغط للمتابعة.
+            </p>
           </div>
-          <div>
-            <span className="font-black text-lg text-white block">ELNOUR HOMES</span>
-            <span className="text-[10px] font-bold text-[#d5af58] tracking-widest uppercase">
-              {isOwnerOrAdmin ? "لوحة الإدارة" : "لوحة المشرف"}
-            </span>
-          </div>
-        </div>
-
-        {/* Menu Links */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-1">
-          {allowedMenuItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = location === item.path;
-            return (
-              <Link key={item.path} href={item.path}>
-                <div
-                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
-                    isActive
-                      ? "bg-[#d5af58] text-[#24211d] shadow-sm"
-                      : "text-[#d5cebf] hover:bg-[#343029] hover:text-white"
-                  }`}
-                >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  <span>{item.label}</span>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
-
-        {/* Footer */}
-        <div className="p-4 border-t border-[#36312a] space-y-2">
-          <Link href="/">
-            <Button variant="ghost" size="sm" className="w-full text-xs text-[#ded7cb] hover:text-white justify-start font-bold">
-              <ExternalLink className="ml-2 h-3.5 w-3.5" />
-              عرض المتجر الرئيسي
-            </Button>
-          </Link>
           <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              logout();
-              setLocation("/admin-login");
-            }}
-            className="w-full text-xs text-red-400 hover:text-red-300 hover:bg-red-950/30 justify-start font-bold"
+            onClick={() => startLogin()}
+            size="lg"
+            className="w-full shadow-lg hover:shadow-xl transition-all"
           >
-            <LogOut className="ml-2 h-3.5 w-3.5" />
-            تسجيل الخروج
+            تسجيل الدخول
           </Button>
         </div>
-      </aside>
-
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Top Navbar */}
-        <header className="h-16 border-b border-[#e8e2d8] bg-white/80 backdrop-blur px-4 sm:px-6 flex items-center justify-between sticky top-0 z-20">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setMobileOpen(!mobileOpen)}
-              className="lg:hidden p-2 rounded-xl text-[#24211d] hover:bg-[#eee8dd]"
+      </div>
+    );
+  }
+  if (user.role !== "admin") {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="flex flex-col items-center gap-8 p-8 max-w-md w-full">
+          <div className="flex flex-col items-center gap-6">
+            <h1 className="text-2xl font-semibold tracking-tight text-center">
+              لوحة التحكم للإدارة فقط
+            </h1>
+            <p className="text-sm text-muted-foreground text-center max-w-sm">
+              حسابك حساب عميل. لعرض طلباتك ومشترياتك استخدم صفحة حسابي.
+            </p>
+          </div>
+          <div className="flex w-full flex-col gap-3 sm:flex-row">
+            <Button
+              onClick={() => setLocation("/account")}
+              size="lg"
+              className="flex-1 shadow-lg hover:shadow-xl transition-all"
             >
-              {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-            </button>
-            <span className="font-bold text-sm text-[#24211d]">
-              {allMenuItems.find((m) => m.path === location)?.label || "لوحة التحكم"}
-            </span>
+              فتح حسابي
+            </Button>
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => logout()}
+              className="flex-1 shadow-lg hover:shadow-xl transition-all"
+            >
+              تسجيل خروج
+            </Button>
           </div>
+        </div>
+      </div>
+    );
+  }
 
-          <div className="flex items-center gap-3">
-            <Badge variant="gold" className="text-xs px-2.5 py-0.5">
-              {isOwnerOrAdmin ? "المدير العام" : "مشرف"}
-            </Badge>
-            <Link href="/" target="_blank">
-              <Button size="sm" variant="outline" className="hidden sm:inline-flex rounded-xl font-bold border-[#d5af58]/40">
-                <ExternalLink className="ml-1.5 h-3.5 w-3.5 text-[#a8822d]" />
-                المتجر
-              </Button>
-            </Link>
-          </div>
-        </header>
+  return (
+    <SidebarProvider
+      style={
+        {
+          "--sidebar-width": `${sidebarWidth}px`,
+        } as CSSProperties
+      }
+    >
+      <DashboardLayoutContent setSidebarWidth={setSidebarWidth}>
+        {children}
+      </DashboardLayoutContent>
+    </SidebarProvider>
+  );
+}
 
-        {/* Mobile Menu */}
-        {mobileOpen && (
-          <div className="lg:hidden fixed inset-x-0 top-16 bottom-0 z-50 bg-[#24211d] text-white p-4 overflow-y-auto space-y-1">
-            {allowedMenuItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = location === item.path;
-              return (
-                <Link key={item.path} href={item.path} onClick={() => setMobileOpen(false)}>
-                  <div
-                    className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold ${
-                      isActive ? "bg-[#d5af58] text-[#24211d]" : "text-[#ded7cb] hover:bg-[#343029]"
-                    }`}
-                  >
-                    <Icon className="h-4 w-4" />
-                    <span>{item.label}</span>
-                  </div>
-                </Link>
-              );
-            })}
-            <div className="pt-4 border-t border-[#36312a]">
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  logout();
-                  setLocation("/admin-login");
-                }}
-                className="w-full text-red-400 font-bold justify-start"
+type DashboardLayoutContentProps = {
+  children: React.ReactNode;
+  setSidebarWidth: (width: number) => void;
+};
+
+function DashboardLayoutContent({
+  children,
+  setSidebarWidth,
+}: DashboardLayoutContentProps) {
+  const { user, logout } = useAuth();
+  const [location, setLocation] = useLocation();
+  const { state, toggleSidebar } = useSidebar();
+  const isCollapsed = state === "collapsed";
+  const [isResizing, setIsResizing] = useState(false);
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const activeMenuItem = menuItems.find(item => item.path === location);
+  const isMobile = useIsMobile();
+  // Only the site owner may manage admin accounts
+  const { data: meData } = trpc.adminAuth.me.useQuery(undefined, { retry: false });
+  const isOwner = meData?.isOwner === true;
+  const ownerMenuItems = isOwner
+    ? [...menuItems, { icon: Users, label: "حسابات المدراء", path: "/admin/admins" }]
+    : menuItems;
+
+  useEffect(() => {
+    if (isCollapsed) {
+      setIsResizing(false);
+    }
+  }, [isCollapsed]);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return;
+
+      const sidebarLeft = sidebarRef.current?.getBoundingClientRect().left ?? 0;
+      const newWidth = e.clientX - sidebarLeft;
+      if (newWidth >= MIN_WIDTH && newWidth <= MAX_WIDTH) {
+        setSidebarWidth(newWidth);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    if (isResizing) {
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+    }
+
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, [isResizing, setSidebarWidth]);
+
+  return (
+    <>
+      <div className="relative" ref={sidebarRef}>
+        <Sidebar
+          collapsible="icon"
+          className="border-r-0"
+          disableTransition={isResizing}
+        >
+          <SidebarHeader className="h-16 justify-center">
+            <div className="flex items-center gap-3 px-2 transition-all w-full">
+              <button
+                onClick={toggleSidebar}
+                className="h-8 w-8 flex items-center justify-center hover:bg-accent rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring shrink-0"
+                aria-label="Toggle navigation"
               >
-                <LogOut className="ml-2 h-4 w-4" />
-                تسجيل الخروج
-              </Button>
+                <PanelLeft className="h-4 w-4 text-muted-foreground" />
+              </button>
+              {!isCollapsed ? (
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="font-semibold tracking-tight truncate">
+                    لوحة التحكم
+                  </span>
+                </div>
+              ) : null}
+            </div>
+          </SidebarHeader>
+
+          <SidebarContent className="gap-0">
+            <SidebarMenu className="px-2 py-1">
+              {ownerMenuItems.map(item => {
+                const isActive = location === item.path;
+                return (
+                  <SidebarMenuItem key={item.path}>
+                    <SidebarMenuButton
+                      isActive={isActive}
+                      onClick={() => setLocation(item.path)}
+                      tooltip={item.label}
+                      className={`h-10 transition-all font-normal`}
+                    >
+                      <item.icon
+                        className={`h-4 w-4 ${isActive ? "text-primary" : ""}`}
+                      />
+                      <span>{item.label}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarContent>
+
+          <SidebarFooter className="p-3">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-3 rounded-lg px-1 py-1 hover:bg-accent/50 transition-colors w-full text-left group-data-[collapsible=icon]:justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  <Avatar className="h-9 w-9 border shrink-0">
+                    <AvatarFallback className="text-xs font-medium">
+                      {user?.name?.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0 group-data-[collapsible=icon]:hidden">
+                    <p className="text-sm font-medium truncate leading-none">
+                      {user?.name || "-"}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate mt-1.5">
+                      {user?.email || "-"}
+                    </p>
+                  </div>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem
+                  onClick={logout}
+                  className="cursor-pointer text-destructive focus:text-destructive"
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>تسجيل الخروج</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </SidebarFooter>
+        </Sidebar>
+        <div
+          className={`absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-primary/20 transition-colors ${isCollapsed ? "hidden" : ""}`}
+          onMouseDown={() => {
+            if (isCollapsed) return;
+            setIsResizing(true);
+          }}
+          style={{ zIndex: 50 }}
+        />
+      </div>
+
+      <SidebarInset>
+        {isMobile && (
+          <div className="flex border-b h-14 items-center justify-between bg-background/95 px-2 backdrop-blur supports-[backdrop-filter]:backdrop-blur sticky top-0 z-40">
+            <div className="flex items-center gap-2">
+              <SidebarTrigger className="h-9 w-9 rounded-lg bg-background" />
+              <div className="flex items-center gap-3">
+                <div className="flex flex-col gap-1">
+                  <span className="tracking-tight text-foreground">
+                    {activeMenuItem?.label ?? "لوحة التحكم"}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         )}
-
-        {/* Body Content */}
-        <main className="p-4 sm:p-6 lg:p-8 flex-1">{children}</main>
-      </div>
-    </div>
+        <main className="flex-1 p-4">{children}</main>
+      </SidebarInset>
+    </>
   );
 }
