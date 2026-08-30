@@ -6,18 +6,28 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, RefreshCw, Phone, MapPin, Package, Search, Filter, ChevronDown, MessageCircle } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { 
+  Loader2, RefreshCw, Phone, MapPin, Package, Search, 
+  MessageCircle, Eye, Download, FileSpreadsheet, ExternalLink, 
+  Tag, Palette, Ruler, CheckCircle2, UserCheck, Calendar
+} from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { buildOrderWhatsAppUrl } from "@/lib/orderWhatsApp";
+import { createOrderInvoicePdf, orderInvoiceFileName } from "@/lib/orderInvoicePdf";
+
 
 const statusColors: Record<string, string> = {
-  new: "bg-green-100 text-green-800",
-  contacted: "bg-blue-100 text-blue-800",
-  confirmed: "bg-purple-100 text-purple-800",
-  shipped: "bg-cyan-100 text-cyan-800",
-  delivered: "bg-amber-100 text-amber-800",
-  cancelled: "bg-red-100 text-red-800",
+  new: "bg-green-100 text-green-800 border-green-300",
+  contacted: "bg-blue-100 text-blue-800 border-blue-300",
+  confirmed: "bg-purple-100 text-purple-800 border-purple-300",
+  shipped: "bg-cyan-100 text-cyan-800 border-cyan-300",
+  delivered: "bg-amber-100 text-amber-800 border-amber-300",
+  cancelled: "bg-red-100 text-red-800 border-red-300",
 };
 
 const statusLabels: Record<string, string> = {
@@ -45,23 +55,27 @@ export default function AdminOrders() {
   const utils = trpc.useUtils();
   const { data: orders, isLoading, isFetching, refetch } = trpc.orders.list.useQuery();
   const { data: stats, refetch: refetchStats } = trpc.orders.stats.useQuery();
+  const { data: contact } = trpc.contactInfo.get.useQuery();
+  
   const [updatingOrderId, setUpdatingOrderId] = useState<number | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
+  const [adminNotes, setAdminNotes] = useState("");
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
   const updateStatus = trpc.orders.updateStatus.useMutation({
-    onMutate: async ({ id, status }) => {
+    onMutate: async ({ id, status, notes }) => {
       setUpdatingOrderId(id);
       await utils.orders.list.cancel();
       const previousOrders = utils.orders.list.getData();
 
-      // Reflect the selected state immediately in both table and Kanban views.
       utils.orders.list.setData(undefined, (currentOrders) =>
-        currentOrders?.map((order) => order.id === id ? { ...order, status } : order),
+        currentOrders?.map((order) => order.id === id ? { ...order, status, notes: notes ?? order.notes } : order),
       );
 
       return { previousOrders };
     },
     onSuccess: async () => {
-      toast.success("تم تحديث حالة الطلب");
-      // Reconcile the optimistic UI with the saved database state and refresh the counts.
+      toast.success("تم تحديث حالة الطلب بنجاح");
       await Promise.all([
         utils.orders.list.invalidate(),
         utils.orders.stats.invalidate(),
@@ -80,9 +94,61 @@ export default function AdminOrders() {
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
-  const handleStatusChange = (id: number, currentStatus: StatusType, nextStatus: string) => {
-    if (nextStatus === currentStatus || updatingOrderId === id) return;
-    updateStatus.mutate({ id, status: nextStatus as StatusType });
+  const handleStatusChange = (id: number, nextStatus: string, notes?: string) => {
+    updateStatus.mutate({ id, status: nextStatus, notes });
+  };
+
+  const handleOpenDetails = (order: any) => {
+    setSelectedOrder(order);
+    setAdminNotes(order.notes ?? "");
+  };
+
+  const handleSaveNotes = () => {
+    if (!selectedOrder) return;
+    updateStatus.mutate({ id: selectedOrder.id, status: selectedOrder.status, notes: adminNotes });
+    setSelectedOrder({ ...selectedOrder, notes: adminNotes });
+  };
+
+  const handleDownloadInvoice = async (order: any) => {
+    try {
+      setIsGeneratingPdf(true);
+      const originalPrice = parseFloat(order.productPrice || "0") || 0;
+      const discount = parseFloat(order.discountValue || "0") || 0;
+      const finalPrice = parseFloat(order.totalAfterDiscount || order.productPrice || "0") || originalPrice;
+
+      const blob = await createOrderInvoicePdf({
+        orderId: order.id,
+        createdAt: order.createdAt,
+        customerName: order.customerName,
+        customerPhone: order.customerPhone,
+        customerAddress: order.customerAddress,
+        productName: order.productName || "منتج استيل فاخر",
+        selectedSize: order.selectedSize,
+        selectedColor: order.selectedColor,
+        originalTotal: originalPrice,
+        discount: discount,
+        finalTotal: finalPrice,
+        couponCode: order.couponCode,
+        status: statusLabels[order.status] ?? order.status,
+        lang: "ar",
+        contactPhone: contact?.phone || "01121748885",
+      });
+
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = orderInvoiceFileName(order.id);
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success("تم تنزيل الفاتورة PDF بنجاح");
+    } catch (e: any) {
+      toast.error("فشل إنشاء الفاتورة: " + (e.message || ""));
+    } finally {
+      setIsGeneratingPdf(false);
+    }
   };
 
   const handleRefresh = async () => {
@@ -91,20 +157,32 @@ export default function AdminOrders() {
       utils.orders.stats.invalidate(),
     ]);
     await Promise.all([refetch(), refetchStats()]);
-    toast.success("تم تحميل أحدث الطلبات");
+    toast.success("تم تحديث قائمة الطلبات");
   };
 
-  const getCustomerWhatsAppUrl = (order: NonNullable<typeof orders>[number]) => buildOrderWhatsAppUrl({
+  const getCustomerWhatsAppUrl = (order: any) => buildOrderWhatsAppUrl({
     id: order.id,
     customerName: order.customerName,
     customerPhone: order.customerPhone,
-    productName: order.productName,
+    productName: `${order.productName || "الطلب"}${order.selectedSize ? ` (مقاس: ${order.selectedSize})` : ""}${order.selectedColor ? ` (لون: ${order.selectedColor})` : ""}`,
     status: order.status,
     orderUrl: `${window.location.origin}/account/orders/${order.id}`,
   });
 
   if (!isAuthenticated || user?.role !== 'admin') {
-    return <div className="p-8 text-center">ليس لديك صلاحية الوصول</div>;
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center p-8 text-center bg-[#faf8f5]">
+        <div className="max-w-md w-full rounded-2xl border border-[#e0dacd] bg-white p-8 shadow-md">
+          <h1 className="text-2xl font-bold text-[#24211d]">لوحة التحكم للإدارة فقط</h1>
+          <p className="mt-3 text-sm text-muted-foreground">
+            يرجى تسجيل الدخول للوصول إلى إدارة الطلبات.
+          </p>
+          <Button className="mt-6 w-full bg-[#24211d] text-white hover:bg-[#ad842f]" onClick={() => window.location.assign("/admin-login")}>
+            تسجيل الدخول للإدارة
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   const filteredOrders = orders?.filter(order => {
@@ -113,6 +191,8 @@ export default function AdminOrders() {
       order.customerName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       order.customerPhone?.includes(searchQuery) ||
       order.productName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      order.selectedSize?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      order.selectedColor?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       String(order.id).includes(searchQuery);
     return matchesStatus && matchesSearch;
   });
@@ -124,33 +204,36 @@ export default function AdminOrders() {
     <DashboardLayout>
       <div className="space-y-6">
         <div className="flex items-center justify-between flex-wrap gap-4">
-          <h1 className="text-2xl font-bold">إدارة الطلبات</h1>
+          <div>
+            <h1 className="text-2xl font-bold text-[#24211d]">إدارة الطلبات والعملاء</h1>
+            <p className="text-xs text-muted-foreground mt-1">عرض وتتبع تفاصيل كل طلب، المقاس واللون المختار، والفواتير</p>
+          </div>
           <div className="flex items-center gap-3">
-            <Button onClick={handleRefresh} disabled={isFetching} variant="outline" size="sm">
-              <RefreshCw className={`ml-2 h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
-              {isFetching ? "جارٍ التحديث..." : "تحديث"}
+            <Button onClick={handleRefresh} disabled={isFetching} variant="outline" size="sm" className="gap-2">
+              <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+              {isFetching ? "جارٍ التحديث..." : "تحديث الطلبات"}
             </Button>
           </div>
         </div>
 
         {/* Stats Summary */}
         {stats && (
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
             {Object.entries(statusLabels).map(([key, label]) => {
-              const count = (stats as any)[key] ?? 0;
+              const count = (stats as any)[key] ?? (key === "new" ? stats.newCount : key === "contacted" ? stats.contactedCount : key === "confirmed" ? stats.confirmedCount : key === "shipped" ? stats.shippedCount : key === "delivered" ? stats.deliveredCount : key === "cancelled" ? stats.cancelledCount : 0) ?? 0;
               return (
                 <button
                   key={key}
                   onClick={() => setFilterStatus(filterStatus === key ? "all" : key)}
-                  className={`p-3 rounded-xl text-center transition-all cursor-pointer ${
-                    filterStatus === key ? "ring-2 ring-amber-400 scale-105" : "hover:scale-102"
+                  className={`p-3 rounded-xl border text-center transition-all cursor-pointer bg-white shadow-sm ${
+                    filterStatus === key ? "ring-2 ring-[#ad842f] border-[#ad842f] scale-105" : "hover:border-gray-400"
                   }`}
                 >
-                  <div className={`p-2 rounded-lg mb-1 ${statusColors[key]}`}>
-                    <span className="text-lg">{statusIcons[key]}</span>
+                  <div className={`p-2 rounded-lg mb-1 inline-block ${statusColors[key]}`}>
+                    <span className="text-base">{statusIcons[key]}</span>
                   </div>
-                  <p className="text-sm font-medium">{label}</p>
-                  <p className="text-xl font-bold">{count}</p>
+                  <p className="text-xs font-semibold text-gray-700">{label}</p>
+                  <p className="text-lg font-black text-[#24211d]">{count}</p>
                 </button>
               );
             })}
@@ -163,34 +246,34 @@ export default function AdminOrders() {
             <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <input
               type="text"
-              placeholder="ابحث بالاسم أو الهاتف أو المنتج..."
+              placeholder="ابحث بالاسم، الهاتف، اسم المنتج، المقاس، أو اللون..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pr-10 pl-4 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-amber-400 focus:border-transparent"
+              className="w-full pr-10 pl-4 py-2 border border-[#d9d3c4] rounded-xl text-sm bg-white focus:ring-2 focus:ring-[#ad842f] focus:outline-none"
             />
           </div>
           <div className="flex gap-2">
             <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="w-[160px]">
+              <SelectTrigger className="w-[160px] bg-white border-[#d9d3c4] rounded-xl">
                 <SelectValue placeholder="كل الحالات" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">كل الحالات</SelectItem>
+                <SelectItem value="all">كل الحالات ({orders?.length ?? 0})</SelectItem>
                 {Object.entries(statusLabels).map(([key, label]) => (
                   <SelectItem key={key} value={key}>{statusIcons[key]} {label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <div className="flex border rounded-lg overflow-hidden">
+            <div className="flex border border-[#d9d3c4] rounded-xl overflow-hidden bg-white">
               <button
                 onClick={() => setViewMode("table")}
-                className={`px-3 py-2 text-sm font-medium ${viewMode === "table" ? "bg-amber-50 text-amber-700" : "bg-white text-muted-foreground hover:bg-gray-50"}`}
+                className={`px-3 py-2 text-sm font-bold ${viewMode === "table" ? "bg-[#24211d] text-white" : "text-gray-600 hover:bg-gray-100"}`}
               >
                 جدول
               </button>
               <button
                 onClick={() => setViewMode("kanban")}
-                className={`px-3 py-2 text-sm font-medium ${viewMode === "kanban" ? "bg-amber-50 text-amber-700" : "bg-white text-muted-foreground hover:bg-gray-50"}`}
+                className={`px-3 py-2 text-sm font-bold ${viewMode === "kanban" ? "bg-[#24211d] text-white" : "text-gray-600 hover:bg-gray-100"}`}
               >
                 لوحة
               </button>
@@ -200,86 +283,134 @@ export default function AdminOrders() {
 
         {/* Table View */}
         {viewMode === "table" && (
-          <Card>
+          <Card className="rounded-2xl border-[#e0dacd] shadow-sm overflow-hidden bg-white">
             <CardContent className="p-0">
               {isLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="h-8 w-8 animate-spin text-[#ad842f]" />
                 </div>
               ) : filteredOrders && filteredOrders.length > 0 ? (
                 <div className="overflow-x-auto">
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="bg-[#f8f7f4]">
                       <TableRow>
-                        <TableHead>#</TableHead>
-                        <TableHead>العميل</TableHead>
-                        <TableHead>الهاتف</TableHead>
-                        <TableHead>المنتج</TableHead>
-                        <TableHead>السعر</TableHead>
-                        <TableHead>المصدر</TableHead>
-                        <TableHead>الحالة</TableHead>
-                        <TableHead>التاريخ</TableHead>
-                        <TableHead>إجراء</TableHead>
+                        <TableHead className="font-bold text-[#24211d] w-12 text-center">#</TableHead>
+                        <TableHead className="font-bold text-[#24211d]">بيانات العميل</TableHead>
+                        <TableHead className="font-bold text-[#24211d]">تفاصيل المنتج والخيارات المختارة</TableHead>
+                        <TableHead className="font-bold text-[#24211d]">السعر والإجمالي</TableHead>
+                        <TableHead className="font-bold text-[#24211d]">المصدر</TableHead>
+                        <TableHead className="font-bold text-[#24211d]">حالة الطلب</TableHead>
+                        <TableHead className="font-bold text-[#24211d]">التاريخ</TableHead>
+                        <TableHead className="font-bold text-[#24211d] text-center">الإجراءات</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filteredOrders.map((order) => (
-                        <TableRow key={order.id} className={order.status === 'new' ? 'bg-green-50/50' : ''}>
-                          <TableCell className="font-medium">{order.id}</TableCell>
+                        <TableRow key={order.id} className={`transition-colors hover:bg-[#faf8f5] ${order.status === 'new' ? 'bg-green-50/40' : ''}`}>
+                          <TableCell className="font-bold text-center text-gray-700">{order.id}</TableCell>
+                          
+                          {/* Client Info */}
                           <TableCell>
-                            <div>
-                              <p className="font-medium">{order.customerName}</p>
+                            <div className="space-y-1">
+                              <p className="font-bold text-[#24211d] flex items-center gap-1.5">
+                                <UserCheck className="h-3.5 w-3.5 text-[#ad842f]" />
+                                {order.customerName}
+                              </p>
+                              <a href={`tel:${order.customerPhone}`} className="text-xs font-semibold text-blue-600 hover:underline flex items-center gap-1">
+                                <Phone className="h-3 w-3" />
+                                <span dir="ltr">{order.customerPhone}</span>
+                              </a>
                               {order.customerAddress && (
-                                <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                                  <MapPin className="h-3 w-3" />
+                                <p className="text-xs text-muted-foreground flex items-center gap-1 max-w-[200px] truncate" title={order.customerAddress}>
+                                  <MapPin className="h-3 w-3 shrink-0 text-gray-400" />
                                   {order.customerAddress}
                                 </p>
                               )}
                             </div>
                           </TableCell>
+
+                          {/* Product & Options (Size, Color, Message) */}
                           <TableCell>
-                            <a href={`tel:${order.customerPhone}`} className="text-blue-600 hover:underline flex items-center gap-1">
-                              <Phone className="h-3 w-3" />
-                              {order.customerPhone}
-                            </a>
-                          </TableCell>
-                          <TableCell>
-                            <div>
-                              <p className="font-medium">{order.productName || "-"}</p>
+                            <div className="space-y-1.5 max-w-[280px]">
+                              <p className="font-bold text-sm text-[#24211d] leading-snug">
+                                {order.productName || "طلب مخصص"}
+                              </p>
+
+                              {/* Size and Color badges */}
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                {order.selectedSize ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-50 text-[#8c681d] border border-amber-200">
+                                    <Ruler className="h-3 w-3" />
+                                    المقاس: {order.selectedSize}
+                                  </span>
+                                ) : null}
+
+                                {order.selectedColor ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-zinc-100 text-zinc-800 border border-zinc-200">
+                                    <Palette className="h-3 w-3 text-[#ad842f]" />
+                                    اللون: {order.selectedColor}
+                                  </span>
+                                ) : null}
+                              </div>
+
                               {order.message && (
-                                <p className="text-xs text-muted-foreground mt-1 max-w-[200px] truncate">{order.message}</p>
+                                <p className="text-[11px] text-gray-500 bg-gray-50 p-1.5 rounded-lg border border-gray-100 truncate" title={order.message}>
+                                  💬 {order.message}
+                                </p>
                               )}
                             </div>
                           </TableCell>
-                          <TableCell>{order.productPrice ? `${order.productPrice} ج.م` : "-"}</TableCell>
+
+                          {/* Pricing & Discounts */}
                           <TableCell>
-                            {order.utmSource ? (
-                              <Badge variant="outline" className="text-xs">{order.utmSource}</Badge>
-                            ) : order.utmCampaign ? (
-                              <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700">{order.utmCampaign}</Badge>
-                            ) : (
-                              <span className="text-muted-foreground text-sm">مباشر</span>
-                            )}
+                            <div className="space-y-1 text-xs">
+                              <p className="font-black text-sm text-[#24211d]">
+                                {order.totalAfterDiscount || order.productPrice ? `${order.totalAfterDiscount || order.productPrice} ج.م` : "-"}
+                              </p>
+                              {order.discountValue && Number(order.discountValue) > 0 ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                  <Tag className="h-2.5 w-2.5" />
+                                  خصم {order.discountValue} ج {order.couponCode ? `(${order.couponCode})` : ""}
+                                </span>
+                              ) : null}
+                            </div>
                           </TableCell>
+
+                          {/* Source */}
+                          <TableCell>
+                            <span className="text-xs text-gray-500">
+                              {order.utmSource ? (
+                                <Badge variant="outline" className="text-[10px]">{order.utmSource}</Badge>
+                              ) : order.utmCampaign ? (
+                                <Badge variant="outline" className="text-[10px] bg-purple-50 text-purple-700">{order.utmCampaign}</Badge>
+                              ) : (
+                                "مباشر"
+                              )}
+                            </span>
+                          </TableCell>
+
+                          {/* Order Status Select */}
                           <TableCell>
                             <Select
                               value={order.status}
                               disabled={updatingOrderId === order.id}
-                              onValueChange={(val: string) => handleStatusChange(order.id, order.status as StatusType, val)}
+                              onValueChange={(val: string) => handleStatusChange(order.id, val)}
                             >
-                              <SelectTrigger className={`w-[120px] h-8 text-xs ${statusColors[order.status]}`}>
+                              <SelectTrigger className={`w-[125px] h-8 text-xs font-bold border rounded-lg ${statusColors[order.status]}`}>
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
                                 {Object.entries(statusLabels).map(([key, label]) => (
-                                  <SelectItem key={key} value={key}>
+                                  <SelectItem key={key} value={key} className="text-xs font-bold">
                                     {statusIcons[key]} {label}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
                           </TableCell>
-                          <TableCell className="text-xs text-muted-foreground">
+
+                          {/* Date */}
+                          <TableCell className="text-xs text-gray-500 whitespace-nowrap">
                             {new Date(order.createdAt).toLocaleDateString("ar-EG", {
                               year: "numeric",
                               month: "short",
@@ -288,24 +419,40 @@ export default function AdminOrders() {
                               minute: "2-digit",
                             })}
                           </TableCell>
+
+                          {/* Actions */}
                           <TableCell>
-                            <div className="flex gap-2">
+                            <div className="flex items-center justify-center gap-1.5">
+                              {/* Open Full Details Modal */}
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-8 px-2 text-xs font-bold gap-1 border-[#ad842f]/40 hover:bg-[#ad842f]/10 text-[#8c681d]"
+                                onClick={() => handleOpenDetails(order)}
+                                title="عرض التفاصيل الكاملة والفاتورة"
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                                التفاصيل
+                              </Button>
+
+                              {/* WhatsApp Direct */}
                               {getCustomerWhatsAppUrl(order) ? (
                                 <a
                                   href={getCustomerWhatsAppUrl(order)!}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 rounded-lg bg-green-600 px-2 py-1.5 text-xs font-medium text-white transition-colors hover:bg-green-700"
-                                  title="يفتح محادثة العميل برسالة حالة الطلب الجاهزة"
+                                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[#25d366] text-white hover:bg-[#20b859] transition-colors"
+                                  title="مراسلة العميل على واتساب بتفاصيل طلبه"
                                 >
                                   <MessageCircle className="h-4 w-4" />
-                                  أرسل واتساب
                                 </a>
                               ) : null}
+
+                              {/* Direct Call */}
                               <a
                                 href={`tel:${order.customerPhone}`}
-                                className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600"
-                                title="اتصل"
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors"
+                                title="اتصال هاتفي"
                               >
                                 <Phone className="h-4 w-4" />
                               </a>
@@ -318,9 +465,9 @@ export default function AdminOrders() {
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-                  <Package className="h-12 w-12 mb-4 opacity-50" />
-                  <p className="text-lg">لا توجد طلبات{filterStatus !== "all" ? " بهذه الحالة" : ""}</p>
-                  <p className="text-sm mt-2">ستظهر الطلبات هنا عندما يقوم العملاء بملء نموذج الطلب</p>
+                  <Package className="h-12 w-12 mb-4 opacity-50 text-[#ad842f]" />
+                  <p className="text-lg font-bold text-[#24211d]">لا توجد طلبات{filterStatus !== "all" ? " بهذه الحالة" : ""}</p>
+                  <p className="text-xs mt-1">ستظهر الطلبات هنا فور قيام العملاء بإتمام الشراء أو الطلب من المتجر</p>
                 </div>
               )}
             </CardContent>
@@ -329,101 +476,109 @@ export default function AdminOrders() {
 
         {/* Kanban Board View */}
         {viewMode === "kanban" && (
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
             {Object.entries(statusLabels).map(([statusKey, statusLabel]) => {
               const statusOrders = getOrdersByStatus(statusKey);
               return (
                 <div key={statusKey} className="min-h-[400px]">
-                  <Card className="h-full">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-sm flex items-center justify-between">
-                        <span className="flex items-center gap-2">
+                  <Card className="h-full rounded-2xl border-[#e0dacd] shadow-sm bg-white">
+                    <CardHeader className="pb-3 bg-[#f8f7f4] rounded-t-2xl border-b border-[#e0dacd]">
+                      <CardTitle className="text-sm font-bold flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
                           <span>{statusIcons[statusKey]}</span>
                           {statusLabel}
                         </span>
-                        <Badge className={statusColors[statusKey]}>
+                        <Badge className={`${statusColors[statusKey]} text-xs font-black`}>
                           {statusOrders.length}
                         </Badge>
                       </CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-2 max-h-[600px] overflow-y-auto">
+                    <CardContent className="space-y-3 p-3 max-h-[650px] overflow-y-auto">
                       {isLoading ? (
                         <div className="flex justify-center py-8">
-                          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                          <Loader2 className="h-6 w-6 animate-spin text-[#ad842f]" />
                         </div>
                       ) : statusOrders.length > 0 ? (
                         statusOrders.map((order) => (
-                          <Card key={order.id} className="p-3 border-2 hover:border-amber-300 transition-colors cursor-pointer">
+                          <Card 
+                            key={order.id} 
+                            onClick={() => handleOpenDetails(order)}
+                            className="p-3.5 rounded-xl border border-gray-200 hover:border-[#ad842f] hover:shadow-md transition-all cursor-pointer bg-[#faf8f5]"
+                          >
                             <div className="space-y-2">
                               <div className="flex items-start justify-between">
-                                <p className="font-medium text-sm">{order.customerName}</p>
-                                <span className="text-xs text-muted-foreground">#{order.id}</span>
+                                <p className="font-bold text-sm text-[#24211d]">{order.customerName}</p>
+                                <span className="text-xs font-mono font-bold text-gray-500">#{order.id}</span>
                               </div>
-                              <p className="text-xs text-muted-foreground flex items-center gap-1">
+
+                              <p className="text-xs font-semibold text-blue-600 flex items-center gap-1">
                                 <Phone className="h-3 w-3" />
-                                {order.customerPhone}
+                                <span dir="ltr">{order.customerPhone}</span>
                               </p>
-                              {order.productName && (
-                                <p className="text-xs bg-amber-50 rounded px-2 py-1 text-amber-800">
-                                  {order.productName}
+
+                              {/* Product Info */}
+                              <div className="bg-white p-2 rounded-lg border border-gray-200 space-y-1">
+                                <p className="text-xs font-bold text-[#24211d] line-clamp-1">
+                                  {order.productName || "طلب مخصص"}
                                 </p>
-                              )}
-                              {order.productPrice && (
-                                <p className="text-xs font-medium">{order.productPrice} ج.م</p>
-                              )}
-                              {order.customerAddress && (
-                                <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                  <MapPin className="h-3 w-3" />
-                                  <span className="truncate">{order.customerAddress}</span>
-                                </p>
-                              )}
-                              <div className="flex items-center justify-between pt-2 border-t">
-                                <span className="text-xs text-muted-foreground">
+                                <div className="flex flex-wrap gap-1">
+                                  {order.selectedSize ? (
+                                    <span className="text-[10px] bg-amber-50 text-[#8c681d] px-1.5 py-0.5 rounded font-bold">
+                                      📏 {order.selectedSize}
+                                    </span>
+                                  ) : null}
+                                  {order.selectedColor ? (
+                                    <span className="text-[10px] bg-zinc-100 text-zinc-800 px-1.5 py-0.5 rounded font-bold">
+                                      🎨 {order.selectedColor}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center justify-between pt-1">
+                                <span className="text-xs font-black text-[#24211d]">
+                                  {order.totalAfterDiscount || order.productPrice ? `${order.totalAfterDiscount || order.productPrice} ج.م` : "-"}
+                                </span>
+                                <span className="text-[10px] text-gray-500">
                                   {new Date(order.createdAt).toLocaleDateString("ar-EG", { month: "short", day: "numeric" })}
                                 </span>
+                              </div>
+
+                              <div className="flex gap-1.5 pt-1 border-t border-gray-200" onClick={(e) => e.stopPropagation()}>
                                 <Select
                                   value={order.status}
                                   disabled={updatingOrderId === order.id}
-                                  onValueChange={(val: string) => handleStatusChange(order.id, order.status as StatusType, val)}
+                                  onValueChange={(val: string) => handleStatusChange(order.id, val)}
                                 >
-                                  <SelectTrigger className="w-[100px] h-7 text-xs">
+                                  <SelectTrigger className={`flex-1 h-7 text-[11px] font-bold ${statusColors[order.status]}`}>
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
                                     {Object.entries(statusLabels).map(([key, label]) => (
-                                      <SelectItem key={key} value={key}>
+                                      <SelectItem key={key} value={key} className="text-xs font-bold">
                                         {statusIcons[key]} {label}
                                       </SelectItem>
                                     ))}
                                   </SelectContent>
                                 </Select>
-                              </div>
-                              <div className="flex gap-1">
+
                                 {getCustomerWhatsAppUrl(order) ? (
                                   <a
                                     href={getCustomerWhatsAppUrl(order)!}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="flex-1 flex items-center justify-center gap-1 rounded bg-green-600 p-1.5 text-xs text-white transition-colors hover:bg-green-700"
-                                    title="يفتح محادثة العميل برسالة حالة الطلب الجاهزة"
+                                    className="flex h-7 w-7 items-center justify-center rounded bg-[#25d366] text-white hover:bg-[#20b859]"
+                                    title="واتساب"
                                   >
-                                    <MessageCircle className="h-3 w-3" />
-                                    أرسل واتساب
+                                    <MessageCircle className="h-3.5 w-3.5" />
                                   </a>
                                 ) : null}
-                                <a
-                                  href={`tel:${order.customerPhone}`}
-                                  className="flex-1 flex items-center justify-center gap-1 p-1.5 rounded text-xs bg-blue-50 text-blue-700 hover:bg-blue-100"
-                                >
-                                  <Phone className="h-3 w-3" />
-                                  اتصل
-                                </a>
                               </div>
                             </div>
                           </Card>
                         ))
                       ) : (
-                        <div className="text-center py-8 text-muted-foreground text-sm">
+                        <div className="text-center py-8 text-muted-foreground text-xs">
                           لا توجد طلبات
                         </div>
                       )}
@@ -435,31 +590,213 @@ export default function AdminOrders() {
           </div>
         )}
 
-        {/* Order Status Guide */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">دليل حالات الطلبات</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-              {[
-                { key: "new", label: "جديد", desc: "طلب وصل حديثاً ولم يتم التواصل مع العميل بعد", color: "border-green-300 bg-green-50" },
-                { key: "contacted", label: "تم التواصل", desc: "تم الاتصال بالعميل ومناقشة الطلب", color: "border-blue-300 bg-blue-50" },
-                { key: "confirmed", label: "تم التأكيد", desc: "العميل أكد الطلب وتم الاتفاق على التفاصيل", color: "border-purple-300 bg-purple-50" },
-                { key: "delivered", label: "تم التوصيل", desc: "تم تسليم المنتج للعميل بنجاح", color: "border-amber-300 bg-amber-50" },
-                { key: "cancelled", label: "ملغى", desc: "تم إلغاء الطلب من العميل أو منك", color: "border-red-300 bg-red-50" },
-              ].map((item) => (
-                <div key={item.key} className={`p-3 rounded-lg border ${item.color}`}>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span>{statusIcons[item.key]}</span>
-                    <span className="font-medium text-sm">{item.label}</span>
+        {/* Order Details & Dossier Modal */}
+        <Dialog open={Boolean(selectedOrder)} onOpenChange={(open) => !open && setSelectedOrder(null)}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl p-6">
+            {selectedOrder ? (
+              <div className="space-y-6 text-right" dir="rtl">
+                <DialogHeader className="text-right border-b pb-4">
+                  <div className="flex items-center justify-between">
+                    <DialogTitle className="text-xl font-black text-[#24211d]">
+                      تفاصيل الطلب #{selectedOrder.id}
+                    </DialogTitle>
+                    <Badge className={`text-xs font-bold px-3 py-1 ${statusColors[selectedOrder.status]}`}>
+                      {statusIcons[selectedOrder.status]} {statusLabels[selectedOrder.status] ?? selectedOrder.status}
+                    </Badge>
                   </div>
-                  <p className="text-xs text-muted-foreground">{item.desc}</p>
+                  <DialogDescription className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
+                    <Calendar className="h-3.5 w-3.5" />
+                    تاريخ الطلب: {new Date(selectedOrder.createdAt).toLocaleString("ar-EG")}
+                  </DialogDescription>
+                </DialogHeader>
+
+                {/* Customer Information Card */}
+                <div className="rounded-2xl border border-[#e0dacd] bg-[#fcfbf7] p-4 space-y-3">
+                  <h3 className="font-bold text-sm text-[#8c681d] flex items-center gap-2">
+                    <UserCheck className="h-4 w-4" />
+                    بيانات العميل
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <span className="text-xs text-gray-500 block">الاسم:</span>
+                      <span className="font-bold text-[#24211d]">{selectedOrder.customerName}</span>
+                    </div>
+                    <div>
+                      <span className="text-xs text-gray-500 block">رقم الهاتف:</span>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="font-bold font-mono text-[#24211d]" dir="ltr">{selectedOrder.customerPhone}</span>
+                        <a href={`tel:${selectedOrder.customerPhone}`} className="text-blue-600 hover:text-blue-800" title="اتصال">
+                          <Phone className="h-3.5 w-3.5" />
+                        </a>
+                        {getCustomerWhatsAppUrl(selectedOrder) ? (
+                          <a href={getCustomerWhatsAppUrl(selectedOrder)!} target="_blank" rel="noreferrer" className="text-green-600 hover:text-green-800" title="واتساب">
+                            <MessageCircle className="h-3.5 w-3.5" />
+                          </a>
+                        ) : null}
+                      </div>
+                    </div>
+                    {selectedOrder.customerEmail ? (
+                      <div>
+                        <span className="text-xs text-gray-500 block">البريد الإلكتروني:</span>
+                        <span className="font-semibold text-gray-700 text-xs">{selectedOrder.customerEmail}</span>
+                      </div>
+                    ) : null}
+                    {selectedOrder.customerAddress ? (
+                      <div className="sm:col-span-2">
+                        <span className="text-xs text-gray-500 block">عنوان الشحن والتوصيل:</span>
+                        <span className="font-semibold text-[#24211d] text-sm flex items-start gap-1 mt-0.5">
+                          <MapPin className="h-4 w-4 text-[#ad842f] shrink-0 mt-0.5" />
+                          {selectedOrder.customerAddress}
+                        </span>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+
+                {/* Product & Selection Details Card */}
+                <div className="rounded-2xl border border-[#e0dacd] bg-[#fcfbf7] p-4 space-y-3">
+                  <h3 className="font-bold text-sm text-[#8c681d] flex items-center gap-2">
+                    <Package className="h-4 w-4" />
+                    المنتج والخيارات المختارة بدقة
+                  </h3>
+
+                  <div className="bg-white rounded-xl border border-[#e8e2d5] p-3 space-y-2">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <p className="font-black text-base text-[#24211d]">
+                        {selectedOrder.productName || "طلب مخصص"}
+                      </p>
+                      {selectedOrder.productId ? (
+                        <a 
+                          href={`/product/${selectedOrder.productId}`} 
+                          target="_blank" 
+                          rel="noreferrer"
+                          className="text-xs text-[#ad842f] hover:underline inline-flex items-center gap-1 font-bold"
+                        >
+                          معاينة المنتج بالمتجر
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      ) : null}
+                    </div>
+
+                    {/* Detailed Specs Grid */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-2 border-t border-gray-100 text-xs">
+                      <div className="p-2 rounded-lg bg-[#f8f7f4] border border-gray-200">
+                        <span className="text-gray-500 block font-semibold">📏 المقاس المختار:</span>
+                        <span className="font-black text-sm text-[#24211d] mt-0.5 block">
+                          {selectedOrder.selectedSize || "قياسي"}
+                        </span>
+                      </div>
+
+                      <div className="p-2 rounded-lg bg-[#f8f7f4] border border-gray-200">
+                        <span className="text-gray-500 block font-semibold">🎨 اللون المختار:</span>
+                        <span className="font-black text-sm text-[#24211d] mt-0.5 block">
+                          {selectedOrder.selectedColor || "ذهبي / افتراضي"}
+                        </span>
+                      </div>
+
+                      <div className="p-2 rounded-lg bg-[#f8f7f4] border border-gray-200">
+                        <span className="text-gray-500 block font-semibold">💵 السعر الأساسي:</span>
+                        <span className="font-black text-sm text-[#24211d] mt-0.5 block">
+                          {selectedOrder.productPrice ? `${selectedOrder.productPrice} ج.م` : "-"}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Discount & Coupon breakdown */}
+                    {selectedOrder.discountValue && Number(selectedOrder.discountValue) > 0 ? (
+                      <div className="flex items-center justify-between p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-xs font-bold text-emerald-800">
+                        <span className="flex items-center gap-1">
+                          <Tag className="h-3.5 w-3.5 text-emerald-600" />
+                          كوبون الخصم: {selectedOrder.couponCode || "تخفيض خاص"}
+                        </span>
+                        <span>- {selectedOrder.discountValue} ج.م</span>
+                      </div>
+                    ) : null}
+
+                    {/* Final Net Total */}
+                    <div className="flex items-center justify-between pt-2 border-t border-gray-200 font-black text-base text-[#24211d]">
+                      <span>الإجمالي النهائي المطلوب:</span>
+                      <span className="text-lg text-emerald-700">
+                        {selectedOrder.totalAfterDiscount || selectedOrder.productPrice} ج.م
+                      </span>
+                    </div>
+                  </div>
+
+                  {selectedOrder.message ? (
+                    <div className="p-3 rounded-xl bg-amber-50/50 border border-amber-200 text-xs">
+                      <span className="font-bold text-amber-900 block mb-1">ملاحظات وطلب العميل الخاص:</span>
+                      <p className="text-gray-700 leading-relaxed">{selectedOrder.message}</p>
+                    </div>
+                  ) : null}
+                </div>
+
+                {/* Admin Status & Notes Section */}
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold">تغيير حالة الطلب:</Label>
+                    <Select
+                      value={selectedOrder.status}
+                      onValueChange={(val) => {
+                        handleStatusChange(selectedOrder.id, val, adminNotes);
+                        setSelectedOrder({ ...selectedOrder, status: val });
+                      }}
+                    >
+                      <SelectTrigger className="w-full bg-white border-[#d9d3c4] font-bold">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(statusLabels).map(([key, label]) => (
+                          <SelectItem key={key} value={key} className="font-bold">
+                            {statusIcons[key]} {label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold">ملاحظات الإدارة الداخلية (لا يراها العميل):</Label>
+                    <Textarea
+                      rows={2}
+                      value={adminNotes}
+                      onChange={(e) => setAdminNotes(e.target.value)}
+                      placeholder="اكتب ملاحظاتك هنا (مثل: تم الاتفاق على ميعاد التسليم يوم الخميس...)"
+                      className="bg-white border-[#d9d3c4] text-xs"
+                    />
+                    <Button size="sm" variant="outline" onClick={handleSaveNotes} className="mt-1 text-xs font-bold">
+                      حفظ الملاحظات
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Action Buttons: Invoice & WhatsApp */}
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t">
+                  <Button
+                    variant="outline"
+                    className="gap-2 border-[#ad842f] text-[#8c681d] font-bold"
+                    onClick={() => handleDownloadInvoice(selectedOrder)}
+                    disabled={isGeneratingPdf}
+                  >
+                    {isGeneratingPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                    تنزيل فاتورة الطلب PDF
+                  </Button>
+
+                  {getCustomerWhatsAppUrl(selectedOrder) ? (
+                    <a
+                      href={getCustomerWhatsAppUrl(selectedOrder)!}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 rounded-xl bg-[#25d366] px-4 py-2 text-sm font-bold text-white shadow hover:bg-[#20b859]"
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                      مراسلة العميل بالطلب عبر واتساب
+                    </a>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+          </DialogContent>
+        </Dialog>
       </div>
     </DashboardLayout>
   );
