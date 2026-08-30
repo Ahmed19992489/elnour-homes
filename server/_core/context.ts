@@ -52,7 +52,7 @@ async function authenticateAdminSession(
     return null;
   }
 
-  const session = await db.getActiveAdminSession(jti, new Date());
+  const session = await db.getActiveAdminSession(jti);
   if (!session) return null;
 
   const credential = await db.getAdminCredentialByPhone(session.adminPhone);
