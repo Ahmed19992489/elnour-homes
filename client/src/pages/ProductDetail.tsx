@@ -394,9 +394,26 @@ export default function ProductDetail() {
 
   useEffect(() => {
     setSelectedImage(0);
-    setSelectedSize("");
-    setSelectedColor("");
-  }, [id]);
+    if (product) {
+      const opts = parseSizeOptions(product.sizeOptions);
+      if (opts.length > 0) {
+        setSelectedSize(opts[0].labelAr);
+      } else {
+        const sz = splitOptions(product.sizes);
+        setSelectedSize(sz[0] || "");
+      }
+      const copts = parseColorOptions(product.colorOptions);
+      if (copts.length > 0) {
+        setSelectedColor(copts[0].labelAr);
+      } else {
+        const clr = splitOptions(product.colors);
+        setSelectedColor(clr[0] || "");
+      }
+    } else {
+      setSelectedSize("");
+      setSelectedColor("");
+    }
+  }, [id, product]);
 
   const handleOrder = (e: React.FormEvent) => {
     e.preventDefault();
@@ -522,56 +539,359 @@ export default function ProductDetail() {
           </div>
 
           {/* Details */}
-          <div className="space-y-6">
+          <div className="space-y-5">
             <div>
-              <Badge variant="secondary" className="mb-3">{product.category}</Badge>
-              <h1 className="text-3xl font-bold mb-2">{displayName}</h1>
+              <div className="flex items-center gap-2 mb-2">
+                <Badge variant="secondary" className="bg-amber-50 text-[#8b6821] border border-amber-200">{product.category}</Badge>
+                {product.featured ? <Badge className="bg-[#24211d] text-[#e3c97d]">مميز</Badge> : null}
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-black text-[#24211d] leading-tight mb-2">{displayName}</h1>
               {lang === "en" && product.nameAr && (
                 <p className="text-sm text-muted-foreground">{product.nameAr}</p>
               )}
             </div>
 
-            <div className="text-3xl font-bold text-amber-600">
-              <span className="flex flex-col">
-                <span>{isPerMeter ? (
-                  <>{formatPrice(pricePerMeterValue)} <span className="text-lg text-muted-foreground">{lang === "ar" ? "ج.م / متر" : "EGP / meter"}</span>{priceValue ? <span className="ms-2 text-base font-medium text-muted-foreground">({lang === "ar" ? "سعر ابتدائي" : "starting from"} {formatPrice(priceValue)} {currency})</span> : null}</>
-                ) : sizeOptions.length && selectedSize ? (
-                  <>{formatPrice(sizePriceValue)} <span className="text-lg text-muted-foreground">{currency}</span></>
-                ) : (
-                  <>{product.price} <span className="text-lg text-muted-foreground">{currency}</span>{!isPerMeter && sizeOptions.length ? <span className="ms-2 text-base font-medium text-muted-foreground">{lang === "ar" ? "(اختر المقاس لمعرفة السعر)" : "(select a size to see the price)"}</span> : null}</>
-                )}</span>
-                {(() => {
-                  const sqm = selectedSize ? computedSquareMeterPrice(selectedSize, sqmPrice) : null;
-                  if (sqm === null) return null;
-                  return (
-                    <span className="mt-1 text-xs font-medium text-[#8a806f]" dir="auto">
-                      {lang === "ar"
-                        ? `≈ ${(sqm / sqmPrice).toFixed(2)} م² × ${formatPrice(sqmPrice)} ج/م² = ${formatPrice(sqm)} ${currency}`
-                        : `≈ ${(sqm / sqmPrice).toFixed(2)} m² × ${formatPrice(sqmPrice)} EGP/m² = ${formatPrice(sqm)} ${currency}`}
-                    </span>
-                  );
-                })()}
-              </span>
+            {/* Price Box */}
+            <div className="p-3.5 rounded-2xl bg-gradient-to-r from-[#faf8f5] to-[#f4efe4] border border-[#e3dbc9]">
+              <div className="flex items-baseline justify-between flex-wrap gap-2">
+                <div className="text-2xl sm:text-3xl font-black text-[#96702a]">
+                  <span>{isPerMeter ? (
+                    <>{formatPrice(pricePerMeterValue)} <span className="text-base text-muted-foreground">{lang === "ar" ? "ج.م / متر" : "EGP / meter"}</span>{priceValue ? <span className="ms-2 text-sm font-medium text-muted-foreground">({lang === "ar" ? "يبدأ من" : "from"} {formatPrice(priceValue)} {currency})</span> : null}</>
+                  ) : sizeOptions.length && selectedSize ? (
+                    <>{formatPrice(sizePriceValue)} <span className="text-base font-bold text-[#514c42]">{currency}</span></>
+                  ) : (
+                    <>{product.price} <span className="text-base font-bold text-[#514c42]">{currency}</span></>
+                  )}</span>
+                </div>
+                <span className="text-xs font-bold text-[#25d366] bg-green-50 px-2.5 py-1 rounded-full border border-green-200">
+                  {lang === "ar" ? "شحن ومعاينة متوفرة" : "Delivery Available"}
+                </span>
+              </div>
+              {(() => {
+                const sqm = selectedSize ? computedSquareMeterPrice(selectedSize, sqmPrice) : null;
+                if (sqm === null) return null;
+                return (
+                  <p className="mt-1.5 text-xs font-medium text-[#8a806f]" dir="auto">
+                    {lang === "ar"
+                      ? `≈ ${(sqm / sqmPrice).toFixed(2)} م² × ${formatPrice(sqmPrice)} ج/م² = ${formatPrice(sqm)} ${currency}`
+                      : `≈ ${(sqm / sqmPrice).toFixed(2)} m² × ${formatPrice(sqmPrice)} EGP/m² = ${formatPrice(sqm)} ${currency}`}
+                  </p>
+                );
+              })()}
             </div>
 
             {product.description && (
-              <p className="text-muted-foreground leading-relaxed">{product.description}</p>
+              <p className="text-sm text-muted-foreground leading-relaxed">{product.description}</p>
             )}
 
+            {/* 1. Size Options (3 Sizes) */}
+            {sizeOptions.length > 0 ? (
+              <div className="space-y-2.5 rounded-2xl border border-[#e3dbc9] bg-[#fcfbf7] p-3.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Ruler className="h-4 w-4 text-[#ad842f]" />
+                    <h3 className="font-bold text-sm text-[#24211d]">{lang === "ar" ? "اختر المقاس المطلوب" : "Choose Size"}</h3>
+                  </div>
+                  <span className="text-[11px] font-bold text-[#8a806f] bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                    {lang === "ar" ? `${sizeOptions.length} مقاسات` : `${sizeOptions.length} sizes`}
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {sizeOptions.map((opt) => {
+                    const label = lang === "ar" ? opt.labelAr : opt.labelEn;
+                    const isSelected = selectedSize === opt.labelAr;
+                    const optPrice = parseFloat(opt.price) || priceValue;
+                    return (
+                      <button
+                        type="button"
+                        key={opt.labelAr}
+                        onClick={() => setSelectedSize(opt.labelAr)}
+                        aria-pressed={isSelected}
+                        className={`flex flex-col items-center justify-center p-2.5 rounded-xl border text-center transition-all ${
+                          isSelected
+                            ? "border-[#ad842f] bg-[#24211d] text-white shadow-sm ring-1 ring-[#ad842f]"
+                            : "border-[#d9d1c0] bg-white text-[#3d382f] hover:border-[#ad842f] hover:bg-[#faf8f5]"
+                        }`}
+                      >
+                        <span className="text-xs font-bold leading-snug flex items-center gap-1">
+                          {isSelected ? <Check className="h-3 w-3 text-[#e3c97d] shrink-0" /> : null}
+                          {label}
+                        </span>
+                        <span className={`text-xs font-black mt-1 ${isSelected ? "text-[#e3c97d]" : "text-[#ad842f]"}`}>
+                          {formatPrice(optPrice)} {currency}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : sizes.length > 0 ? (
+              <div className="space-y-2.5 rounded-2xl border border-[#e3dbc9] bg-[#fcfbf7] p-3.5">
+                <div className="flex items-center gap-2">
+                  <Ruler className="h-4 w-4 text-[#ad842f]" />
+                  <h3 className="font-bold text-sm text-[#24211d]">{lang === "ar" ? "اختر المقاس" : "Choose Size"}</h3>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  {sizes.map((size) => (
+                    <button
+                      type="button"
+                      key={size}
+                      onClick={() => setSelectedSize(size)}
+                      aria-pressed={selectedSize === size}
+                      className={`flex min-h-11 flex-col items-center justify-center p-2 rounded-xl border text-center transition ${
+                        selectedSize === size
+                          ? "border-[#ad842f] bg-[#24211d] text-white shadow-sm"
+                          : "border-[#d9d1c0] bg-white text-[#3d382f] hover:border-[#ad842f]"
+                      }`}
+                    >
+                      <span className="text-xs font-bold">{size}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {/* 2. Color Options (3 Colors including Silver) */}
+            {(colorOptions.length > 0 || colors.length > 0) && (
+              <div className="space-y-2.5 rounded-2xl border border-[#e3dbc9] bg-[#fcfbf7] p-3.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Palette className="h-4 w-4 text-[#ad842f]" />
+                    <h3 className="font-bold text-sm text-[#24211d]">{lang === "ar" ? "اختر لون الاستيل" : "Choose Steel Colour"}</h3>
+                  </div>
+                  {selectedColor && (
+                    <span className="text-[11px] font-bold text-[#ad842f]">
+                      {lang === "ar" ? `المحدد: ${selectedColor}` : `Selected: ${selectedColor}`}
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {colorOptions.length > 0 ? (
+                    colorOptions.map((opt) => {
+                      const label = lang === "ar" ? opt.labelAr : opt.labelEn;
+                      const isSelected = selectedColor === opt.labelAr;
+                      return (
+                        <button
+                          type="button"
+                          key={opt.labelAr}
+                          onClick={() => setSelectedColor(opt.labelAr)}
+                          aria-pressed={isSelected}
+                          className={`flex items-center justify-center gap-1.5 p-2 rounded-xl border text-xs font-bold transition-all ${
+                            isSelected
+                              ? "border-[#ad842f] bg-[#24211d] text-white shadow-sm ring-1 ring-[#ad842f]"
+                              : "border-[#d9d1c0] bg-white text-[#3d382f] hover:border-[#ad842f] hover:bg-[#faf8f5]"
+                          }`}
+                        >
+                          <span
+                            className="h-3.5 w-3.5 rounded-full border border-black/20 shrink-0 shadow-inner"
+                            style={{ backgroundColor: opt.hex }}
+                          />
+                          <span className="truncate">{label}</span>
+                          {isSelected ? <Check className="h-3 w-3 text-[#e3c97d] shrink-0" /> : null}
+                        </button>
+                      );
+                    })
+                  ) : (
+                    colors.map((color) => {
+                      const isSelected = selectedColor === color;
+                      return (
+                        <button
+                          type="button"
+                          key={color}
+                          onClick={() => setSelectedColor(color)}
+                          aria-pressed={isSelected}
+                          className={`flex items-center justify-center gap-1.5 p-2 rounded-xl border text-xs font-bold transition ${
+                            isSelected
+                              ? "border-[#ad842f] bg-[#24211d] text-white shadow-sm"
+                              : "border-[#d9d1c0] bg-white text-[#3d382f] hover:border-[#ad842f]"
+                          }`}
+                        >
+                          <span
+                            className="h-3.5 w-3.5 rounded-full border border-black/20 shrink-0"
+                            style={{ backgroundColor: colorSwatch(color) }}
+                          />
+                          <span>{color}</span>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* 3. Primary CTAs & Action Buttons */}
+            <div className="space-y-2 pt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="h-12 border-2 border-[#ad842f] text-[#8b6821] hover:bg-[#fdf9ee] font-bold text-xs sm:text-sm"
+                  disabled={isPerMeter}
+                  onClick={() => {
+                    if (sizeOptions.length && !selectedSize) {
+                      toast.error(lang === "ar" ? "يرجى اختيار المقاس أولاً" : "Please select a size first");
+                      return;
+                    }
+                    if (colorOptions.length && !selectedColor) {
+                      toast.error(lang === "ar" ? "يرجى اختيار اللون أولاً" : "Please select a colour first");
+                      return;
+                    }
+                    addItem({
+                      productId: product.id,
+                      selectedSize: selectedSize || undefined,
+                      selectedColor: selectedColor || undefined,
+                      quantity: 1,
+                      unitPrice: sizePriceValue,
+                    });
+                    toast.success(lang === "ar" ? `تمت إضافة «${displayName}» إلى السلة` : `“${displayName}” added to your cart`);
+                  }}
+                >
+                  <ShoppingCart className="ms-0 me-1.5 h-4 w-4" />
+                  {lang === "ar" ? "أضف إلى السلة" : "Add to Cart"}
+                </Button>
+                <Button
+                  size="lg"
+                  className="h-12 bg-[#25d366] hover:bg-[#20bd5a] text-white font-bold text-xs sm:text-sm shadow-md"
+                  onClick={handleWhatsApp}
+                >
+                  <MessageCircle className="ms-0 me-1.5 h-4 w-4" />
+                  {lang === "ar" ? "حجز واتساب" : "WhatsApp"}
+                </Button>
+                <Dialog open={orderOpen} onOpenChange={setOrderOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="lg" className="h-12 font-black text-xs sm:text-sm bg-gradient-to-r from-[#ad842f] to-[#c9a24a] hover:from-[#96702a] hover:to-[#b5913f] text-white shadow-md">
+                      <ArrowRight className="ms-0 me-1.5 h-4 w-4" />
+                      {lang === "ar" ? "اطلب الآن" : "Order Now"}
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto overscroll-contain sm:max-h-[75vh]">
+                    <DialogHeader>
+                      <DialogTitle>{t("orderFormTitle")}</DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={handleOrder} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label>{t("customerName")} *</Label>
+                        <Input
+                          value={orderForm.customerName}
+                          onChange={(e) => setOrderForm({ ...orderForm, customerName: e.target.value })}
+                          required
+                          placeholder={lang === "ar" ? "اكتب اسمك هنا" : "Enter your name"}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>{t("customerPhone")} *</Label>
+                        <Input
+                          value={orderForm.customerPhone}
+                          onChange={(e) => setOrderForm({ ...orderForm, customerPhone: e.target.value })}
+                          required
+                          placeholder="01xxxxxxxxx"
+                          type="tel"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>{lang === "ar" ? "البريد الإلكتروني لتحديثات الطلب" : "Email for order updates"} *</Label>
+                        <Input
+                          value={orderForm.customerEmail}
+                          onChange={(e) => {
+                            setOrderForm({ ...orderForm, customerEmail: e.target.value });
+                            if (emailError) setEmailError("");
+                          }}
+                          onInvalid={(event) => {
+                            event.preventDefault();
+                            setEmailError(lang === "ar" ? "يرجى إدخال بريد إلكتروني صحيح لتلقي تحديثات الطلب." : "Please enter a valid email address for order updates.");
+                          }}
+                          required
+                          type="email"
+                          autoComplete="email"
+                          placeholder="name@example.com"
+                          aria-invalid={Boolean(emailError)}
+                          aria-describedby="customer-email-help"
+                          className={emailError ? "border-destructive focus-visible:ring-destructive" : undefined}
+                        />
+                        <p id="customer-email-help" role={emailError ? "alert" : undefined} className={`text-xs ${emailError ? "font-medium text-destructive" : "text-muted-foreground"}`}>{emailError || (lang === "ar" ? "سنرسل تحديثات حالة الطلب والفاتورة إلى هذا البريد." : "We will send order-status updates and your invoice to this address.")}</p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>{t("customerAddress")}</Label>
+                        <Input
+                          value={orderForm.customerAddress}
+                          onChange={(e) => setOrderForm({ ...orderForm, customerAddress: e.target.value })}
+                          placeholder={lang === "ar" ? "المحافظة - المدينة - المنطقة" : "Governorate - City - Area"}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>{t("orderMessage")} ({lang === "ar" ? "اختياري" : "optional"})</Label>
+                        <Textarea
+                          value={orderForm.message}
+                          onChange={(e) => setOrderForm({ ...orderForm, message: e.target.value })}
+                          placeholder={lang === "ar" ? "اكتب أي ملاحظة إضافية للطلب" : "Add any extra note for your order"}
+                          rows={3}
+                        />
+                      </div>
+                      <div className="bg-muted p-3 rounded-lg space-y-1">
+                        <p className="text-sm font-medium">{t("orderProduct")}: {displayName}</p>
+                        {selectedSize ? <p className="text-sm text-[#514c42]">{lang === "ar" ? "المقاس المختار" : "Selected size"}: <strong>{selectedSize}</strong></p> : null}
+                        {selectedColor ? <p className="text-sm text-[#514c42]">{lang === "ar" ? "اللون المختار" : "Selected colour"}: <strong>{selectedColor}</strong></p> : null}
+                        {isPerMeter ? <p className="text-sm text-amber-600 font-bold">{formatPrice(pricePerMeterValue)} {currency} {lang === "ar" ? "/ متر" : "/ meter"}{lang === "ar" ? " — السعر النهائي حسب القياسات" : " — final price based on measurements"}</p> : <p className="text-sm text-amber-600 font-bold">{formatPrice(sizePriceValue)} {currency}</p>}
+                        {couponState.valid && couponDiscount > 0 && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-green-600 font-medium">{couponState.message}</span>
+                            <span className="text-green-600 font-medium">- {couponDiscount} {currency}</span>
+                          </div>
+                        )}
+                        <p className="text-sm font-bold text-primary pt-1 border-t">{t("orderTotal")}: {formatPrice(finalTotal)} {currency}</p>
+                      </div>
+                      <Button
+                        type="submit"
+                        className="w-full bg-[#26231e] text-white hover:bg-[#ad842f]"
+                        disabled={createOrder.isPending}
+                      >
+                        {createOrder.isPending ? (
+                          <>
+                            <Loader2 className="ms-0 me-2 h-4 w-4 animate-spin" />
+                            {t("sending")}
+                          </>
+                        ) : (
+                          t("submitOrder")
+                        )}
+                      </Button>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </div>
+
+              {/* Wishlist toggle */}
+              <button
+                type="button"
+                onClick={() => {
+                  toggleWishlist(product.id);
+                  toast.success(!wished ? (lang === "ar" ? `تمت إضافة «${displayName}» إلى المفضلة` : `“${displayName}” added to your wishlist`) : (lang === "ar" ? "تمت إزالته من المفضلة" : "Removed from wishlist"));
+                }}
+                aria-pressed={wished}
+                className={`inline-flex w-full items-center justify-center gap-2 rounded-xl border py-2 text-xs font-bold transition hover:scale-[1.005] ${wished ? "border-red-200 bg-red-50 text-red-600" : "border-[#e3dbc9] bg-white text-[#8a806f] hover:border-red-300 hover:text-red-500"}`}
+              >
+                <Heart className={`h-3.5 w-3.5 ${wished ? "fill-current" : ""}`} />
+                {wished ? (lang === "ar" ? "في المفضلة — اضغط للإزالة" : "In wishlist — click to remove") : (lang === "ar" ? "أضف إلى المفضلة" : "Add to wishlist")}
+              </button>
+            </div>
+
+            {/* 4. Specifications */}
             {specs && Object.entries(specs).filter(([, value]) => String(value).trim()).length > 0 && (
-              <div className="rounded-2xl border border-[#e3dbc9] bg-[#fcfbf7] p-4">
-                <h3 className="font-bold mb-3 flex items-center gap-2"><ListChecks className="h-4 w-4 text-[#ad842f]" />{lang === "ar" ? "المواصفات التفصيلية" : "Detailed Specifications"}</h3>
-                <dl className="space-y-2 text-sm">
+              <div className="rounded-2xl border border-[#e3dbc9] bg-[#fcfbf7] p-3.5">
+                <h3 className="font-bold text-xs text-[#24211d] mb-2 flex items-center gap-2">
+                  <ListChecks className="h-3.5 w-3.5 text-[#ad842f]" />
+                  {lang === "ar" ? "المواصفات التفصيلية" : "Detailed Specifications"}
+                </h3>
+                <dl className="grid grid-cols-2 gap-2 text-xs">
                   {Object.entries(specs).map(([key, value]) => {
                     if (!String(value).trim()) return null;
                     const label = key === "material" ? (lang === "ar" ? "المادة" : "Material")
                       : key === "dimensions" ? (lang === "ar" ? "الأبعاد" : "Dimensions")
                       : key === "finish" ? (lang === "ar" ? "التشطيب" : "Finish")
-                      : (lang === "ar" ? "العناية والتنظيف" : "Care & Cleaning");
+                      : (lang === "ar" ? "العناية" : "Care");
                     return (
-                      <div key={key} className="flex items-start justify-between gap-3">
-                        <dt className="text-muted-foreground shrink-0">{label}</dt>
-                        <dd className="font-semibold text-start">{String(value)}</dd>
+                      <div key={key} className="p-2 rounded-lg bg-white border border-[#eae4d5]">
+                        <dt className="text-[10px] text-muted-foreground font-semibold">{label}</dt>
+                        <dd className="font-bold text-[#24211d] truncate mt-0.5">{String(value)}</dd>
                       </div>
                     );
                   })}
@@ -579,144 +899,37 @@ export default function ProductDetail() {
               </div>
             )}
 
-            {sizes.length ? <div className="space-y-3 rounded-2xl border border-[#e3dbc9] bg-[#fcfbf7] p-4">
-              <div className="flex items-center gap-2"><Ruler className="h-4 w-4 text-[#ad842f]" /><h3 className="font-bold">{lang === "ar" ? "اختر المقاس" : "Choose your size"}</h3><span className="text-xs text-[#8a806f]">{lang === "ar" ? "مطلوب" : "Required"}</span></div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">{sizes.map((size) => {
-                const opt = findSizeOption(sizeOptions, size);
-                const optPrice = opt ? parseFloat(opt.price) : sizePriceValue;
+            {/* 6. Why Elnour — trust strip */}
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              {benefits.map((b) => {
+                const Icon = b.icon;
                 return (
-                  <button type="button" key={size} onClick={() => setSelectedSize(size)} aria-pressed={selectedSize === size} className={`flex min-h-12 flex-col items-stretch justify-center gap-0.5 rounded-xl border px-4 py-2 text-start transition ${selectedSize === size ? "border-[#ad842f] bg-[#24211d] text-white shadow-sm" : "border-[#d9d1c0] bg-white text-[#3d382f] hover:border-[#ad842f]"}`}>
-                    <span className="flex items-center gap-2 text-sm font-bold"><span className="flex items-center">{selectedSize === size ? <Check className="h-3.5 w-3.5" /> : <span className="w-3.5" />}{size}</span></span>
-                    <span className={`text-[13px] font-bold leading-none ${selectedSize === size ? "text-[#e3c97d]" : "text-[#ad842f]"}`}>{formatPrice(optPrice)} {currency}</span>
-                  </button>
-                );
-              })}</div>
-            </div> : sizeOptions.length ? <div className="space-y-3 rounded-2xl border border-[#e3dbc9] bg-[#fcfbf7] p-4">
-              <div className="flex items-center gap-2"><Ruler className="h-4 w-4 text-[#ad842f]" /><h3 className="font-bold">{lang === "ar" ? "اختر المقاس" : "Choose your size"}</h3><span className="text-xs text-[#8a806f]">{lang === "ar" ? "كل مقاس له سعر مختلف" : "Each size has its own price"}</span></div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">{sizeOptions.map((opt) => {
-                const label = lang === "ar" ? opt.labelAr : opt.labelEn;
-                return (
-                  <button type="button" key={opt.labelAr} onClick={() => setSelectedSize(opt.labelAr)} aria-pressed={selectedSize === opt.labelAr} className={`flex min-h-12 flex-col items-stretch justify-center gap-0.5 rounded-xl border px-4 py-2 text-start transition ${selectedSize === opt.labelAr ? "border-[#ad842f] bg-[#24211d] text-white shadow-sm" : "border-[#d9d1c0] bg-white text-[#3d382f] hover:border-[#ad842f]"}`}>
-                    <span className="flex items-center gap-2 text-sm font-bold">{selectedSize === opt.labelAr ? <Check className="h-3.5 w-3.5" /> : <span className="w-3.5" />}{label}</span>
-                    <span className={`text-[13px] font-bold leading-none ${selectedSize === opt.labelAr ? "text-[#e3c97d]" : "text-[#ad842f]"}`}>{formatPrice(parseFloat(opt.price))} {currency}</span>
-                  </button>
-                );
-              })}</div>
-            </div> : null}
-
-            {(colors.length > 0 || colorOptions.length > 0) ? <div className="space-y-3 rounded-2xl border border-[#e3dbc9] bg-[#fcfbf7] p-4">
-              <div className="flex items-center gap-2"><Palette className="h-4 w-4 text-[#ad842f]" /><h3 className="font-bold">{lang === "ar" ? "اختر اللون" : "Choose your colour"}</h3><span className="text-xs text-[#8a806f]">{lang === "ar" ? "مطلوب" : "Required"}</span></div>
-
-              <div className="flex flex-wrap gap-2">{colorOptions.length ? colorOptions.map((opt) => {
-                const label = lang === "ar" ? opt.labelAr : opt.labelEn;
-                return <button type="button" key={opt.labelAr} onClick={() => setSelectedColor(opt.labelAr)} aria-pressed={selectedColor === opt.labelAr} className={`inline-flex min-h-11 items-center gap-2 rounded-xl border px-4 text-sm font-bold transition ${selectedColor === opt.labelAr ? "border-[#ad842f] bg-[#24211d] text-white shadow-sm" : "border-[#d9d1c0] bg-white text-[#3d382f] hover:border-[#ad842f]"}`}><span className="h-4 w-4 rounded-full border border-black/15" style={{ backgroundColor: opt.hex }} />{selectedColor === opt.labelAr ? <Check className="h-3.5 w-3.5" /> : null}{label}</button>;
-              }) : colors.map((color) => <button type="button" key={color} onClick={() => setSelectedColor(color)} aria-pressed={selectedColor === color} className={`inline-flex min-h-11 items-center gap-2 rounded-xl border px-4 text-sm font-bold transition ${selectedColor === color ? "border-[#ad842f] bg-[#24211d] text-white shadow-sm" : "border-[#d9d1c0] bg-white text-[#3d382f] hover:border-[#ad842f]"}`}><span className="h-4 w-4 rounded-full border border-black/15" style={{ backgroundColor: colorSwatch(color) }} />{selectedColor === color ? <Check className="h-3.5 w-3.5" /> : null}{color}</button>)}</div>
-            </div> : null}
-
-            {/* Wishlist toggle */}
-            <button
-              type="button"
-              onClick={() => {
-                toggleWishlist(product.id);
-                toast.success(!wished ? (lang === "ar" ? `تمت إضافة «${displayName}» إلى المفضلة` : `“${displayName}” added to your wishlist`) : (lang === "ar" ? "تمت إزالته من المفضلة" : "Removed from wishlist"));
-              }}
-              aria-pressed={wished}
-              className={`inline-flex w-full items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-bold transition hover:scale-[1.01] ${wished ? "border-red-200 bg-red-50 text-red-600" : "border-[#e3dbc9] bg-white text-[#8a806f] hover:border-red-300 hover:text-red-500"}`}
-            >
-              <Heart className={`h-4 w-4 ${wished ? "fill-current" : ""}`} />
-              {wished ? (lang === "ar" ? "في المفضلة — اضغط للإزالة" : "In wishlist — click to remove") : (lang === "ar" ? "أضف إلى المفضلة" : "Add to wishlist")}
-            </button>
-
-            {/* Wall area calculator */}
-            <div className="space-y-3 rounded-2xl border border-[#e3dbc9] bg-[#fcfbf7] p-4">
-              <div className="flex items-center gap-2"><Calculator className="h-4 w-4 text-[#ad842f]" /><h3 className="font-bold">{lang === "ar" ? "حاسبة مساحة الحائط" : "Wall Area Calculator"}</h3><span className="text-xs text-[#8a806f]">{lang === "ar" ? "اعرف مساحتك وتقدير التكلفة بالمتر المربع" : "Know your wall area and an estimated cost per m²"}</span></div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs">{lang === "ar" ? "العرض" : "Width"}</Label>
-                    <span className="text-[11px] text-[#8a806f]">{lang === "ar" ? "يمكنك الإدخال بالسم أو بالمتر" : "Enter in cm or metres"}</span>
+                  <div key={b.en} className="flex items-start gap-2 rounded-xl border border-[#e3dbc9] bg-[#fdfcfa] p-2.5">
+                    <Icon className="h-4 w-4 flex-shrink-0 text-[#ad842f] mt-0.5" />
+                    <div>
+                      <p className="text-xs font-bold text-[#24211d] leading-snug">{lang === "ar" ? b.ar : b.en}</p>
+                      <p className="text-[10px] text-[#8a806f] leading-snug mt-0.5">{lang === "ar" ? b.noteAr : b.noteEn}</p>
+                    </div>
                   </div>
-                  <Input
-                    type="number"
-                    min={0}
-                    inputMode="decimal"
-                    value={calcWidth}
-                    onChange={(e) => { setCalcWidth(e.target.value); setCalcResult(null); }}
-                    placeholder={lang === "ar" ? "مثال: 300 أو 3" : "e.g. 300 or 3"}
-                    className="h-10 bg-white"
-                    aria-label={lang === "ar" ? "عرض الحائط بالسنتيمتر أو بالمتر" : "Wall width in centimetres or metres"}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs">{lang === "ar" ? "الارتفاع" : "Height"}</Label>
-                    <span className="text-[11px] text-[#8a806f]">{lang === "ar" ? "أقل من 100 تُحسب بالمتر" : "Below 100 is treated as metres"}</span>
-                  </div>
-                  <Input
-                    type="number"
-                    min={0}
-                    inputMode="decimal"
-                    value={calcHeight}
-                    onChange={(e) => { setCalcHeight(e.target.value); setCalcResult(null); }}
-                    placeholder={lang === "ar" ? "مثال: 250 أو 2.5" : "e.g. 250 or 2.5"}
-                    className="h-10 bg-white"
-                    aria-label={lang === "ar" ? "ارتفاع الحائط بالسنتيمتر أو بالمتر" : "Wall height in centimetres or metres"}
-                  />
-                </div>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full border-[#ad842f] text-[#8b6821] hover:bg-[#fdf9ee] h-10"
-                onClick={() => {
-                  const w = parseFloat(calcWidth.replace(",", "."));
-                  const h = parseFloat(calcHeight.replace(",", "."));
-                  if (!w || !h || w <= 0 || h <= 0) {
-                    toast.error(lang === "ar" ? "يرجى إدخال العرض والارتفاع" : "Please enter width and height");
-                    return;
-                  }
-                  // Auto-detect unit: values under 100 are treated as metres (e.g. 3 → 300cm), 100+ as centimetres (e.g. 300cm)
-                  const wCm = w < 100 ? w * 100 : w;
-                  const hCm = h < 100 ? h * 100 : h;
-                  if (wCm < 25 || hCm < 25) {
-                    toast.error(lang === "ar" ? "المقاس أصغر من حائط حقيقي — تأكد من الإدخال الصحيح (سم أو متر)" : "The size is smaller than a real wall — check your input (cm or metres)");
-                    return;
-                  }
-                  const sqm = (wCm * hCm) / 10000;
-                  setCalcResult({ sqm, cost: Math.round(sqm * sqmPrice) });
-                }}
-              >
-                <Calculator className="ms-0 me-1.5 h-4 w-4" />
-                {lang === "ar" ? "احسب المساحة" : "Calculate Area"}
-              </Button>
-              {calcResult ? (
-                <div className="rounded-xl border border-[#e3dbc9] bg-white p-3 space-y-1" role="status">
-                  <p className="text-sm">
-                    {lang === "ar" ? "المساحة:" : "Area:"} <strong>{calcResult.sqm.toFixed(2)} {lang === "ar" ? "م²" : "m²"}</strong>
-                  </p>
-                  <p className="text-sm">
-                    {lang === "ar" ? "التقدير بالمتر المربع (" : "Estimate at "}{formatPrice(sqmPrice)} {lang === "ar" ? "ج/م²): " : "EGP/m²: "}<strong className="text-amber-600">{calcResult.cost.toLocaleString()} {currency}</strong>
-                  </p>
-                  <p className="text-xs text-[#8a806f]">{lang === "ar" ? "تقدير استرشادي — السعر النهائي يتوقف على التصميم والألوان المختارة" : "Guideline estimate — the final price depends on the design and chosen colours"}</p>
-                </div>
-              ) : null}
+                );
+              })}
             </div>
 
-            {/* Restock alert */}
+            {/* 7. Restock alert dialog trigger */}
             <Dialog open={restockOpen} onOpenChange={setRestockOpen}>
               <DialogTrigger asChild>
                 <button
                   type="button"
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[#e3dbc9] bg-white px-4 py-2.5 text-sm font-bold text-[#8a806f] transition hover:border-[#ad842f] hover:text-[#8b6821]"
+                  className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-[#e3dbc9] bg-white py-2 text-xs font-bold text-[#8a806f] transition hover:border-[#ad842f] hover:text-[#8b6821]"
                 >
-                  <BellRing className="h-4 w-4" />
-                  {lang === "ar" ? "نبهني عندما يتوفر هذا المنتج" : "Notify me when this product is back in stock"}
+                  <BellRing className="h-3.5 w-3.5" />
+                  {lang === "ar" ? "نبهني عند توفر مقاسات أو ألوان أخرى" : "Notify me when other sizes or colours are in stock"}
                 </button>
               </DialogTrigger>
-              <DialogContent className="max-w-md sm:max-w-md">
+              <DialogContent className="max-w-md">
                 <DialogHeader>
-                  <DialogTitle className="flex items-center gap-2">
-                    <BellRing className="h-5 w-5 text-[#ad842f]" />
+                  <DialogTitle className="flex items-center gap-2 text-base">
+                    <BellRing className="h-4 w-4 text-[#ad842f]" />
                     {lang === "ar" ? "إشعار التوفر" : "Restock Notification"}
                   </DialogTitle>
                 </DialogHeader>
@@ -737,226 +950,36 @@ export default function ProductDetail() {
                   }}
                   className="space-y-3"
                 >
-                  <p className="text-sm text-muted-foreground">{lang === "ar" ? `سيُخطرك فريقنا فور توفر «${displayName}» — سنعرضه عليك أو على بياناتك فور تحديث المخزون.` : `Our team will alert you as soon as “${displayName}” is back in stock.`}</p>
-                  <div className="space-y-1.5">
-                    <Label>{lang === "ar" ? "البريد الإلكتروني" : "Email"}</Label>
-                    <Input
-                      type="email"
-                      value={restockForm.email}
-                      onChange={(e) => setRestockForm({ ...restockForm, email: e.target.value })}
-                      placeholder="name@example.com"
-                      autoComplete="email"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label>{lang === "ar" ? "رقم الهاتف (واتساب)" : "Phone (WhatsApp)"}</Label>
+                  <p className="text-xs text-muted-foreground">{lang === "ar" ? `سيُخطرك فريقنا فور توفر مقاسات أو كميات جديدة من «${displayName}».` : `Our team will alert you as soon as “${displayName}” has new stock.`}</p>
+                  <div className="space-y-1">
+                    <Label className="text-xs">{lang === "ar" ? "رقم الهاتف (واتساب)" : "Phone (WhatsApp)"}</Label>
                     <Input
                       type="tel"
                       value={restockForm.phone}
                       onChange={(e) => setRestockForm({ ...restockForm, phone: e.target.value })}
                       placeholder="01xxxxxxxxx"
+                      className="h-9 text-xs"
                     />
                   </div>
-                  <Button type="submit" className="w-full" disabled={createRestockAlert.isPending}>
-                    {createRestockAlert.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <BellRing className="h-4 w-4" />}
-                    <span className="ms-1">{lang === "ar" ? "سجّلني في قائمة الانتظار" : "Join the waitlist"}</span>
+                  <div className="space-y-1">
+                    <Label className="text-xs">{lang === "ar" ? "البريد الإلكتروني (اختياري)" : "Email (Optional)"}</Label>
+                    <Input
+                      type="email"
+                      value={restockForm.email}
+                      onChange={(e) => setRestockForm({ ...restockForm, email: e.target.value })}
+                      placeholder="name@example.com"
+                      className="h-9 text-xs"
+                    />
+                  </div>
+                  <Button type="submit" className="w-full h-10 bg-[#24211d] text-white hover:bg-[#ad842f] text-xs font-bold" disabled={createRestockAlert.isPending}>
+                    {createRestockAlert.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BellRing className="h-3.5 w-3.5" />}
+                    <span className="ms-1">{lang === "ar" ? "سجّلني في قائمة الانتظار" : "Join Waitlist"}</span>
                   </Button>
                 </form>
               </DialogContent>
             </Dialog>
 
-            {/* Why Elnour — trust strip */}
-            <div className="grid grid-cols-2 gap-3 pt-2">
-              {benefits.map((b) => {
-                const Icon = b.icon;
-                return (
-                  <div key={b.en} className="flex items-start gap-2.5 rounded-xl border border-[#e3dbc9] bg-[#fdfcfa] p-3">
-                    <Icon className="h-5 w-5 flex-shrink-0 text-[#ad842f] mt-0.5" />
-                    <div>
-                      <p className="text-sm font-bold text-[#24211d] leading-snug">{lang === "ar" ? b.ar : b.en}</p>
-                      <p className="text-xs text-[#8a806f] leading-snug mt-0.5">{lang === "ar" ? b.noteAr : b.noteEn}</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-3 pt-4">
-              <Button
-                size="lg"
-                variant="outline"
-                className="flex-1 h-12 border-2 border-[#ad842f] text-[#8b6821] hover:bg-[#fdf9ee]"
-                disabled={isPerMeter}
-                onClick={() => {
-                  if (sizeOptions.length && !selectedSize) {
-                    toast.error(lang === "ar" ? "يرجى اختيار المقاس أولاً" : "Please select a size first");
-                    return;
-                  }
-                  if (colorOptions.length && !selectedColor) {
-                    toast.error(lang === "ar" ? "يرجى اختيار اللون أولاً" : "Please select a colour first");
-                    return;
-                  }
-                  addItem({
-                    productId: product.id,
-                    selectedSize: selectedSize || undefined,
-                    selectedColor: selectedColor || undefined,
-                    quantity: 1,
-                    unitPrice: sizePriceValue,
-                  });
-                  toast.success(lang === "ar" ? `تمت إضافة «${displayName}» إلى السلة` : `“${displayName}” added to your cart`);
-                }}
-              >
-                <ShoppingCart className="ms-0 me-2 h-5 w-5" />
-                {lang === "ar" ? "أضف إلى السلة" : "Add to Cart"}
-              </Button>
-              <Button
-                size="lg"
-                className="flex-1 bg-green-600 hover:bg-green-700 text-white h-12"
-                onClick={handleWhatsApp}
-              >
-                <MessageCircle className="ms-0 me-2 h-5 w-5" />
-                {lang === "ar" ? "احجز عبر واتساب" : "Order via WhatsApp"}
-              </Button>
-              <Dialog open={orderOpen} onOpenChange={setOrderOpen}>
-                <DialogTrigger asChild>
-                  <Button size="lg" className="flex-1 h-13 px-6 text-base font-bold bg-gradient-to-r from-[#ad842f] to-[#c9a24a] hover:from-[#96702a] hover:to-[#b5913f] text-white shadow-lg shadow-amber-200/40">
-                    <ArrowRight className="ms-0 me-2 h-5 w-5" />
-                    {lang === "ar" ? "اطلب الآن" : "Order Now"}
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto overscroll-contain sm:max-h-[75vh]">
-                  <DialogHeader>
-                    <DialogTitle>{t("orderFormTitle")}</DialogTitle>
-                  </DialogHeader>
-                  <form onSubmit={handleOrder} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label>{t("customerName")} *</Label>
-                      <Input
-                        value={orderForm.customerName}
-                        onChange={(e) => setOrderForm({ ...orderForm, customerName: e.target.value })}
-                        required
-                        placeholder={lang === "ar" ? "اكتب اسمك هنا" : "Enter your name"}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>{t("customerPhone")} *</Label>
-                      <Input
-                        value={orderForm.customerPhone}
-                        onChange={(e) => setOrderForm({ ...orderForm, customerPhone: e.target.value })}
-                        required
-                        placeholder="01xxxxxxxxx"
-                        type="tel"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>{lang === "ar" ? "البريد الإلكتروني لتحديثات الطلب" : "Email for order updates"} *</Label>
-                      <Input
-                        value={orderForm.customerEmail}
-                        onChange={(e) => {
-                          setOrderForm({ ...orderForm, customerEmail: e.target.value });
-                          if (emailError) setEmailError("");
-                        }}
-                        onInvalid={(event) => {
-                          event.preventDefault();
-                          setEmailError(lang === "ar" ? "يرجى إدخال بريد إلكتروني صحيح لتلقي تحديثات الطلب." : "Please enter a valid email address for order updates.");
-                        }}
-                        required
-                        type="email"
-                        autoComplete="email"
-                        placeholder="name@example.com"
-                        aria-invalid={Boolean(emailError)}
-                        aria-describedby="customer-email-help"
-                        className={emailError ? "border-destructive focus-visible:ring-destructive" : undefined}
-                      />
-                      <p id="customer-email-help" role={emailError ? "alert" : undefined} className={`text-xs ${emailError ? "font-medium text-destructive" : "text-muted-foreground"}`}>{emailError || (lang === "ar" ? "سنرسل تحديثات حالة الطلب والفاتورة إلى هذا البريد." : "We will send order-status updates and your invoice to this address.")}</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>{t("customerAddress")}</Label>
-                      <Input
-                        value={orderForm.customerAddress}
-                        onChange={(e) => setOrderForm({ ...orderForm, customerAddress: e.target.value })}
-                        placeholder={lang === "ar" ? "المحافظة - المدينة - المنطقة" : "Governorate - City - Area"}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>{t("orderMessage")} ({lang === "ar" ? "اختياري" : "optional"})</Label>
-                      <Textarea
-                        value={orderForm.message}
-                        onChange={(e) => setOrderForm({ ...orderForm, message: e.target.value })}
-                        placeholder={lang === "ar" ? "اكتب أي ملاحظة إضافية للطلب" : "Add any extra note for your order"}
-                        rows={3}
-                      />
-                    </div>
-                    <div className="bg-muted p-3 rounded-lg space-y-1">
-                      <p className="text-sm font-medium">{t("orderProduct")}: {displayName}</p>
-                      {selectedSize ? <p className="text-sm text-[#514c42]">{lang === "ar" ? "المقاس المختار" : "Selected size"}: <strong>{selectedSize}</strong></p> : null}
-                      {selectedColor ? <p className="text-sm text-[#514c42]">{lang === "ar" ? "اللون المختار" : "Selected colour"}: <strong>{selectedColor}</strong></p> : null}
-                      {isPerMeter ? <p className="text-sm text-amber-600 font-bold">{formatPrice(pricePerMeterValue)} {currency} {lang === "ar" ? "/ متر" : "/ meter"}{lang === "ar" ? " — السعر النهائي حسب القياسات" : " — final price based on measurements"}</p> : <p className="text-sm text-amber-600 font-bold">{formatPrice(sizePriceValue)} {currency}</p>}
-                      {couponState.valid && couponDiscount > 0 && (
-                        <div className="flex justify-between text-sm">
-                          <span className="text-green-600 font-medium">{couponState.message}</span>
-                          <span className="text-green-600 font-medium">- {couponDiscount} {currency}</span>
-                        </div>
-                      )}
-                      {couponDiscount > 0 && (
-                        <div className="flex justify-between text-sm font-bold border-t pt-1">
-                          <span>{lang === "ar" ? "الإجمالي بعد الخصم" : "Total after discount"}</span>
-                          <span>{finalTotal.toLocaleString()} {currency}</span>
-                        </div>
-                      )}
-                      {isPerMeter && <p className="text-xs text-[#8a806f]">{lang === "ar" ? "يمكنك إضافة هذا المنتج إلى السلة بكمية بالمتر، وسيُحسب الإجمالي بناءً على القياسات المعتمدة." : "You can add this to the cart with a quantity in meters; the total is computed from the approved measurements."}</p>}
-                    </div>
-                    <div className="space-y-2">
-                      <Label className="flex items-center gap-1.5">{lang === "ar" ? "كود الإحالة (إن وجد)" : "Referral Code (if any)"} <Tag className="h-3.5 w-3.5 text-[#ad842f]" /></Label>
-                      <Input
-                        value={referralCodeInput}
-                        onChange={(e) => setReferralCodeInput(e.target.value.toUpperCase())}
-                        placeholder={lang === "ar" ? "مثال: ELN-A1B2 — كود صديق أحالك إلينا" : "e.g. ELN-A1B2 — a friend's code who referred you"}
-                        className="h-9"
-                      />
-                      <p className="text-xs text-muted-foreground">{lang === "ar" ? "إن رشحك أحد العملاء بكوده، أدخله هنا لتُحسب دعوته" : "If a customer referred you with a code, enter it here so their referral is recorded"}</p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>{lang === "ar" ? "كوبون الخصم" : "Coupon Code"}</Label>
-                      <div className="flex gap-2">
-                        <Input
-                          value={couponCode}
-                          onChange={(e) => {
-                            setCouponCode(e.target.value);
-                            if (couponState.valid) setCouponState({ valid: null, discount: 0, message: "", checking: false });
-                          }}
-                          placeholder={lang === "ar" ? "أدخل الكود ثم اضغط تحقق" : "Enter code then verify"}
-                          className="uppercase tracking-wider"
-                          disabled={validateCoupon.isPending}
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="border-2 shrink-0"
-                          disabled={!couponCode.trim() || validateCoupon.isPending}
-                          onClick={() => {
-                            if (!priceValue) return;
-                            validateCoupon.mutate({ code: couponCode.trim(), orderValue: priceValue });
-                          }}
-                        >
-                          {validateCoupon.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : (lang === "ar" ? "تحقق" : "Apply")}
-                        </Button>
-                      </div>
-                      {couponState.message && (
-                        <p className={`text-xs ${couponState.valid ? "text-green-600" : "text-red-500"}`}>{couponState.message}</p>
-                      )}
-                    </div>
-                    <Button type="submit" className="w-full" size="lg" disabled={createOrder.isPending}>
-                      {createOrder.isPending && <Loader2 className="ms-0 me-2 h-4 w-4 animate-spin" />}
-                      {t("submitOrder")}
-                    </Button>
-                  </form>
-                </DialogContent>
-              </Dialog>
-            </div>
-
-            <ReviewSection productId={Number(id)} title={lang === "ar" ? product.nameAr : product.name} />
-
+            {/* Call Us */}
             <div className="border-t pt-4">
               <a href="tel:01118182424" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
                 <Phone className="h-4 w-4" />
@@ -965,6 +988,8 @@ export default function ProductDetail() {
             </div>
           </div>
         </div>
+
+        <ReviewSection productId={Number(id)} title={lang === "ar" ? product.nameAr : product.name} />
       </div>
 
       {/* Mobile sticky order bar: single action for ad conversions */}

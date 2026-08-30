@@ -94,7 +94,70 @@ export const appRouter = router({
       ctx.res.clearCookie(ADMIN_COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return { success: true } as const;
     }),
+    customerLogin: publicProcedure
+      .input(
+        z.object({
+          phone: z.string().min(8, "رقم الهاتف يجب ألا يقل عن 8 أرقام"),
+          name: z.string().min(1, "يرجى كتابة الاسم").optional(),
+          email: z.string().email("بريد إلكتروني غير صالح").optional().or(z.literal("")),
+          address: z.string().optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const normalizedPhone = input.phone.replace(/[^\d+]/g, "").trim();
+        const openId = `cust-${normalizedPhone}`;
+        
+        let existingUser = await db.getUserByOpenId(openId);
+        if (!existingUser) {
+          await db.upsertUser({
+            openId,
+            name: input.name?.trim() || "عميل النور",
+            phone: normalizedPhone,
+            email: input.email?.trim() || null,
+            address: input.address?.trim() || null,
+            loginMethod: "customer_phone",
+            role: "user",
+            lastSignedIn: new Date(),
+          });
+          existingUser = await db.getUserByOpenId(openId);
+        } else if (input.name || input.email || input.address) {
+          await db.upsertUser({
+            openId,
+            name: input.name?.trim() || existingUser.name,
+            email: input.email?.trim() || existingUser.email,
+            address: input.address?.trim() || existingUser.address,
+            phone: normalizedPhone,
+            role: existingUser.role,
+            lastSignedIn: new Date(),
+          });
+          existingUser = await db.getUserByOpenId(openId);
+        }
 
+        const secretKey = new TextEncoder().encode(ENV.cookieSecret);
+        const token = await new SignJWT({
+          openId,
+          id: existingUser?.id ?? 0,
+          name: existingUser?.name ?? input.name,
+          phone: normalizedPhone,
+          email: existingUser?.email,
+          role: existingUser?.role || "user",
+        })
+          .setProtectedHeader({ alg: "HS256" })
+          .setIssuedAt()
+          .setExpirationTime("30d")
+          .sign(secretKey);
+
+        const cookieOptions = getSessionCookieOptions(ctx.req);
+        ctx.res.cookie(COOKIE_NAME, token, {
+          ...cookieOptions,
+          maxAge: 30 * 24 * 60 * 60 * 1000,
+        });
+
+        return {
+          success: true,
+          user: existingUser,
+        };
+      }),
   }),
 
   products: router({

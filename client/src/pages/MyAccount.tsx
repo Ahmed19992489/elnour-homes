@@ -5,6 +5,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { trpc } from "@/lib/trpc";
 import { buildBusinessWhatsAppUrl } from "@/lib/orderWhatsApp";
 import PublicLayout from "@/components/storefront/PublicLayout";
+import CustomerAuthDialog from "@/components/storefront/CustomerAuthDialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -45,6 +46,7 @@ const STATUS_COLOR: Record<string, string> = {
 export default function MyAccount() {
   const { lang, isRTL } = useLanguage();
   const { user, loading } = useAuth();
+  const [authOpen, setAuthOpen] = useState(false);
   const utils = trpc.useUtils();
   const { data: profile, isLoading: profileLoading } = trpc.account.me.useQuery(undefined, { enabled: !!user });
   const { data: myOrders, isLoading: ordersLoading } = trpc.account.orders.useQuery(undefined, { enabled: !!user });
@@ -161,17 +163,18 @@ export default function MyAccount() {
           <h1 className="mt-4 text-2xl font-bold">{t("أنشئ حسابك أو سجّل الدخول", "Create your account or sign in")}</h1>
           <p className="mt-2 max-w-md mx-auto text-muted-foreground">
             {t(
-              "سجّل الدخول بحسابك مرة واحدة وسيُنشأ لك حساب عميل تلقائيًا. بعد ذلك يمكنك متابعة حالة طلباتك، وتحديث اسمك ورقم هاتفك وعنوانك، ومعرفة كل خصم استخدمته.",
-              "Sign in once and your customer account is created automatically. You can then track your order status, update your name, phone, and address, and see every discount you used.",
+              "سجّل الدخول برقم هاتفك لمتابعة حالة طلباتك وفواتيرك، وتحديث عنوانك والتواصل المباشر مع فريق المبيعات.",
+              "Sign in with your phone number to track your order status and invoices, update your details, and contact our sales team directly.",
             )}
           </p>
-          <Button className="mt-6 bg-[#26231e] text-white hover:bg-[#ad842f]" onClick={startLogin}>
+          <Button className="mt-6 bg-[#26231e] text-white hover:bg-[#ad842f] px-8 h-11 font-bold" onClick={() => setAuthOpen(true)}>
             {t("دخول / إنشاء حساب", "Sign in / Create account")}
           </Button>
+          <CustomerAuthDialog open={authOpen} onOpenChange={setAuthOpen} />
           <p className="mt-4 text-xs text-muted-foreground">
             {t(
-              "نستخدم تسجيل دخولًا آمنًا — لن يتم عرض أي بيانات إدارية لك، فلوحة التحكم مخصصة لمالك الموقع فقط.",
-              "We use secure single sign-on — you will never see admin data; the dashboard is reserved for the site owner.",
+              "تسجيل دخول فوري وآمن برقم الهاتف الخاص بك دون أي تعقيد.",
+              "Fast and secure instant login with your phone number.",
             )}
           </p>
         </div>

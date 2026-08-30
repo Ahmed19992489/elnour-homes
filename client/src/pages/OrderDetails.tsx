@@ -8,6 +8,7 @@ import { parseProductImages } from "@/lib/productImages";
 import { createOrderInvoicePdf, orderInvoiceFileName } from "@/lib/orderInvoicePdf";
 import { buildBusinessWhatsAppUrl } from "@/lib/orderWhatsApp";
 import PublicLayout from "@/components/storefront/PublicLayout";
+import CustomerAuthDialog from "@/components/storefront/CustomerAuthDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -137,6 +138,7 @@ export default function OrderDetails() {
   const [isPreparingInvoice, setIsPreparingInvoice] = useState(false);
   const [isDownloadingInvoice, setIsDownloadingInvoice] = useState(false);
   const [invoiceError, setInvoiceError] = useState<string | null>(null);
+  const [authOpen, setAuthOpen] = useState(false);
   const cancelOrder = trpc.account.cancelOrder.useMutation({
     onSuccess: async () => {
       toast.success(t("تم إلغاء الطلب بنجاح", "Order cancelled successfully"));
@@ -152,9 +154,10 @@ export default function OrderDetails() {
           <Package className="mx-auto h-12 w-12 text-[#ad842f]" />
           <h1 className="mt-4 text-2xl font-bold">{t("سجّل الدخول لعرض طلبك", "Sign in to view your order")}</h1>
           <p className="mt-2 text-muted-foreground">{t("تفاصيل الطلب تظهر فقط لصاحب الحساب الذي أنشأه.", "Order details are visible only to the account that placed it.")}</p>
-          <Button className="mt-6 bg-[#26231e] text-white hover:bg-[#ad842f]" onClick={startLogin}>
+          <Button className="mt-6 bg-[#26231e] text-white hover:bg-[#ad842f] px-8 h-11 font-bold" onClick={() => setAuthOpen(true)}>
             {t("دخول / إنشاء حساب", "Sign in / Create account")}
           </Button>
+          <CustomerAuthDialog open={authOpen} onOpenChange={setAuthOpen} />
         </div>
       </PublicLayout>
     );

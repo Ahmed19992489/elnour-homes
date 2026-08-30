@@ -593,13 +593,31 @@ export default function AdminProducts() {
                 </div>
 
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label className="!mb-0">ألوان الدهان الإلكتروني المتاحة (حتى ثلاثة ألوان)</Label>
-                    {colorRows.length < 3 ? (
-                      <Button type="button" size="sm" variant="outline" onClick={addColorRow}>
-                        <Plus className="ml-1 h-3.5 w-3.5" /> لون
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <Label className="!mb-0">ألوان الاستيل المتاحة (ذهبي - سيلفر - أسود)</Label>
+                    <div className="flex items-center gap-1.5">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        className="text-xs h-7"
+                        onClick={() => {
+                          const standard = [
+                            { labelAr: "ذهبي ملكي PVD", labelEn: "Royal Gold PVD", hex: "#D4AF37" },
+                            { labelAr: "سيلفر / فضي كروم", labelEn: "Silver Chrome", hex: "#C0C0C0" },
+                            { labelAr: "أسود مطفي فاخر", labelEn: "Luxury Matte Black", hex: "#1F1F1F" },
+                          ];
+                          setForm({ ...form, colorOptions: serializeColorOptions(standard) });
+                        }}
+                      >
+                        الألوان الثلاثة القياسية
                       </Button>
-                    ) : null}
+                      {colorRows.length < 3 ? (
+                        <Button type="button" size="sm" variant="outline" className="h-7" onClick={addColorRow}>
+                          <Plus className="ml-1 h-3.5 w-3.5" /> لون
+                        </Button>
+                      ) : null}
+                    </div>
                   </div>
                   <div className="space-y-2">
                     {colorRows.map((row, i) => (

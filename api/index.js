@@ -1458,6 +1458,60 @@ var appRouter = router({
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       ctx.res.clearCookie(ADMIN_COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return { success: true };
+    }),
+    customerLogin: publicProcedure.input(
+      z2.object({
+        phone: z2.string().min(8, "\u0631\u0642\u0645 \u0627\u0644\u0647\u0627\u062A\u0641 \u064A\u062C\u0628 \u0623\u0644\u0627 \u064A\u0642\u0644 \u0639\u0646 8 \u0623\u0631\u0642\u0627\u0645"),
+        name: z2.string().min(1, "\u064A\u0631\u062C\u0649 \u0643\u062A\u0627\u0628\u0629 \u0627\u0644\u0627\u0633\u0645").optional(),
+        email: z2.string().email("\u0628\u0631\u064A\u062F \u0625\u0644\u0643\u062A\u0631\u0648\u0646\u064A \u063A\u064A\u0631 \u0635\u0627\u0644\u062D").optional().or(z2.literal("")),
+        address: z2.string().optional()
+      })
+    ).mutation(async ({ ctx, input }) => {
+      const normalizedPhone = input.phone.replace(/[^\d+]/g, "").trim();
+      const openId = `cust-${normalizedPhone}`;
+      let existingUser = await getUserByOpenId(openId);
+      if (!existingUser) {
+        await upsertUser({
+          openId,
+          name: input.name?.trim() || "\u0639\u0645\u064A\u0644 \u0627\u0644\u0646\u0648\u0631",
+          phone: normalizedPhone,
+          email: input.email?.trim() || null,
+          address: input.address?.trim() || null,
+          loginMethod: "customer_phone",
+          role: "user",
+          lastSignedIn: /* @__PURE__ */ new Date()
+        });
+        existingUser = await getUserByOpenId(openId);
+      } else if (input.name || input.email || input.address) {
+        await upsertUser({
+          openId,
+          name: input.name?.trim() || existingUser.name,
+          email: input.email?.trim() || existingUser.email,
+          address: input.address?.trim() || existingUser.address,
+          phone: normalizedPhone,
+          role: existingUser.role,
+          lastSignedIn: /* @__PURE__ */ new Date()
+        });
+        existingUser = await getUserByOpenId(openId);
+      }
+      const secretKey = new TextEncoder().encode(ENV.cookieSecret);
+      const token = await new SignJWT({
+        openId,
+        id: existingUser?.id ?? 0,
+        name: existingUser?.name ?? input.name,
+        phone: normalizedPhone,
+        email: existingUser?.email,
+        role: existingUser?.role || "user"
+      }).setProtectedHeader({ alg: "HS256" }).setIssuedAt().setExpirationTime("30d").sign(secretKey);
+      const cookieOptions = getSessionCookieOptions(ctx.req);
+      ctx.res.cookie(COOKIE_NAME, token, {
+        ...cookieOptions,
+        maxAge: 30 * 24 * 60 * 60 * 1e3
+      });
+      return {
+        success: true,
+        user: existingUser
+      };
     })
   }),
   products: router({
@@ -2800,6 +2854,40 @@ var sdk = new SDKServer();
 // server/_core/context.ts
 init_env();
 var isNonEmptyString3 = (value) => typeof value === "string" && value.length > 0;
+async function authenticateCustomerSession(cookieHeader) {
+  if (!cookieHeader) return null;
+  const cookies = new Map(
+    Object.entries(parseCookieHeader2(cookieHeader))
+  );
+  const token = cookies.get(COOKIE_NAME);
+  if (!token) return null;
+  let payload;
+  try {
+    const secretKey = new TextEncoder().encode(ENV.cookieSecret);
+    const verified = await jwtVerify2(token, secretKey, { algorithms: ["HS256"] });
+    payload = verified.payload;
+  } catch {
+    return null;
+  }
+  const openId = payload.openId;
+  if (!isNonEmptyString3(openId)) return null;
+  const user = await getUserByOpenId(openId);
+  if (user) return user;
+  return {
+    id: typeof payload.id === "number" ? payload.id : 0,
+    openId,
+    name: payload.name || "\u0639\u0645\u064A\u0644 \u0627\u0644\u0646\u0648\u0631",
+    email: payload.email || null,
+    phone: payload.phone || null,
+    address: payload.address || null,
+    loginMethod: "customer_phone",
+    role: payload.role || "user",
+    createdAt: /* @__PURE__ */ new Date(),
+    updatedAt: /* @__PURE__ */ new Date(),
+    lastSignedIn: /* @__PURE__ */ new Date(),
+    referralCode: null
+  };
+}
 async function authenticateAdminSession(cookieHeader) {
   if (!cookieHeader) return null;
   const cookies = new Map(
@@ -2848,6 +2936,13 @@ async function createContext(opts) {
   if (!user) {
     try {
       user = await authenticateAdminSession(opts.req.headers.cookie);
+    } catch (error) {
+      user = null;
+    }
+  }
+  if (!user) {
+    try {
+      user = await authenticateCustomerSession(opts.req.headers.cookie);
     } catch (error) {
       user = null;
     }

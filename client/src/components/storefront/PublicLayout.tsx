@@ -5,12 +5,13 @@ import { trpc } from "@/lib/trpc";
 import { buildBusinessWhatsAppUrl } from "@/lib/orderWhatsApp";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Facebook, Heart, Instagram, Menu, MessageCircle, Search, Send, ShoppingCart, X } from "lucide-react";
+import { Facebook, Heart, Instagram, Menu, MessageCircle, Search, Send, ShoppingCart, UserCheck, X } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { useWishlist } from "@/contexts/WishlistContext";
 import { cartTotals } from "@/lib/cart";
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
+import CustomerAuthDialog from "./CustomerAuthDialog";
 
 const DEFAULT_WHATSAPP = "01118182424";
 const DEFAULT_WHATSAPP_MESSAGE = "مرحباً، أرغب في الاستفسار عن أعمال Elnour for STEEL";
@@ -55,6 +56,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
   const wishlistCtx = useWishlist();
   const wishCount = wishlistCtx.items.length;
   const [menuOpen, setMenuOpen] = useState(false);
+  const [authDialogOpen, setAuthDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const trackPageview = trpc.pageviews.track.useMutation();
   const { data: contact } = trpc.contactInfo.get.useQuery();
@@ -92,6 +94,12 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
   useEffect(() => {
     trackPageview.mutate(getTrackingInput(location));
   }, [location]);
+
+  useEffect(() => {
+    const handleOpenAuth = () => setAuthDialogOpen(true);
+    window.addEventListener("open-customer-auth", handleOpenAuth);
+    return () => window.removeEventListener("open-customer-auth", handleOpenAuth);
+  }, []);
 
   const isAdmin = user?.role === "admin";
 
@@ -191,7 +199,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
             {user ? <>
               <Button variant="outline" size="sm" onClick={() => setLocation(isAdmin ? "/admin" : "/account")}>{isAdmin ? copy.dashboard : copy.account}</Button>
               <Button variant="ghost" size="sm" onClick={logout}>{copy.logout}</Button>
-            </> : !loading ? <Button variant="outline" size="sm" onClick={startLogin}>{copy.login}</Button> : null}
+            </> : !loading ? <Button variant="outline" size="sm" onClick={() => setAuthDialogOpen(true)}>{copy.login}</Button> : null}
             <Button size="sm" className="bg-[#26231e] text-white hover:bg-[#ad842f]" onClick={() => window.open(WHATSAPP_LINK, "_blank", "noopener,noreferrer")}>{copy.contact}</Button>
           </div>
           <div className="flex items-center gap-1 md:hidden">
@@ -221,7 +229,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
             {navItems.map((item) => <button key={item.href} className="rounded-md px-3 py-2 text-right hover:bg-[#eee9dd]" onClick={() => handleNav(item.href)}>{lang === "ar" ? item.ar : item.en}</button>)}
             <div className="mt-2 grid grid-cols-2 gap-2 border-t border-[#d9d3c4] pt-3">
               <Button variant="ghost" className="text-[#8b6821]" onClick={() => handleNav("/admin-login")}>{copy.adminLogin}</Button>
-              {user ? <><Button variant="outline" onClick={() => handleNav(isAdmin ? "/admin" : "/account")}>{isAdmin ? copy.dashboard : copy.account}</Button><Button variant="ghost" onClick={logout}>{copy.logout}</Button></> : <Button variant="outline" className="col-span-2" onClick={startLogin}>{copy.login}</Button>}
+              {user ? <><Button variant="outline" onClick={() => handleNav(isAdmin ? "/admin" : "/account")}>{isAdmin ? copy.dashboard : copy.account}</Button><Button variant="ghost" onClick={logout}>{copy.logout}</Button></> : <Button variant="outline" className="col-span-2" onClick={() => { setMenuOpen(false); setAuthDialogOpen(true); }}>{copy.login}</Button>}
               <Button className="col-span-2 bg-[#26231e] text-white" onClick={() => window.open(WHATSAPP_LINK, "_blank", "noopener,noreferrer")}>{copy.contact}</Button>
             </div>
           </nav>
@@ -229,6 +237,8 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
       </header>
 
       <main>{children}</main>
+
+      <CustomerAuthDialog open={authDialogOpen} onOpenChange={setAuthDialogOpen} />
 
       <div className="fixed bottom-5 right-5 z-30 flex flex-col gap-3" dir="ltr">
         <a

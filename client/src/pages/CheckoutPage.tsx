@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useCart } from "@/contexts/CartContext";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { cartTotals } from "@/lib/cart";
 import { trpc } from "@/lib/trpc";
 import PublicLayout from "@/components/storefront/PublicLayout";
@@ -24,6 +25,7 @@ function priceDisplay(price: number, lang: string) {
 export default function CheckoutPage() {
   const { lang, t } = useLanguage();
   const { items, empty } = useCart();
+  const { user } = useAuth();
   const [, navigate] = useLocation();
   const [hydrated, setHydrated] = useState(false);
 
@@ -34,6 +36,18 @@ export default function CheckoutPage() {
     customerAddress: "",
     message: "",
   });
+
+  useEffect(() => {
+    if (user) {
+      setForm((prev) => ({
+        customerName: prev.customerName || user.name || "",
+        customerPhone: prev.customerPhone || user.phone || "",
+        customerEmail: prev.customerEmail || user.email || "",
+        customerAddress: prev.customerAddress || user.address || "",
+        message: prev.message,
+      }));
+    }
+  }, [user]);
   const [emailError, setEmailError] = useState("");
   const [couponCode, setCouponCode] = useState("");
   const [couponState, setCouponState] = useState<{

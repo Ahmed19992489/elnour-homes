@@ -1,7 +1,7 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
 import { jwtVerify } from "jose";
 import { parse as parseCookieHeader } from "cookie";
-import { ADMIN_COOKIE_NAME } from "../../shared/const";
+import { ADMIN_COOKIE_NAME, COOKIE_NAME } from "../../shared/const";
 import type { User } from "../../drizzle/schema";
 import { sdk } from "./sdk";
 import * as db from "../db";
@@ -15,6 +15,51 @@ export type TrpcContext = {
 
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.length > 0;
+
+/**
+ * Customer session — independent customer login via phone/email.
+ */
+async function authenticateCustomerSession(
+  cookieHeader: string | undefined
+): Promise<User | null> {
+  if (!cookieHeader) return null;
+
+  const cookies = new Map(
+    Object.entries(parseCookieHeader(cookieHeader) as Record<string, string>)
+  );
+  const token = cookies.get(COOKIE_NAME);
+  if (!token) return null;
+
+  let payload: Record<string, unknown>;
+  try {
+    const secretKey = new TextEncoder().encode(ENV.cookieSecret);
+    const verified = await jwtVerify(token, secretKey, { algorithms: ["HS256"] });
+    payload = verified.payload as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+
+  const openId = payload.openId;
+  if (!isNonEmptyString(openId)) return null;
+
+  const user = await db.getUserByOpenId(openId);
+  if (user) return user;
+
+  return {
+    id: typeof payload.id === "number" ? payload.id : 0,
+    openId,
+    name: (payload.name as string) || "عميل النور",
+    email: (payload.email as string) || null,
+    phone: (payload.phone as string) || null,
+    address: (payload.address as string) || null,
+    loginMethod: "customer_phone",
+    role: (payload.role as string) || "user",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    lastSignedIn: new Date(),
+    referralCode: null,
+  } as User;
+}
 
 /**
  * Phone-based admin session — an alternative admin login that does not depend
@@ -72,7 +117,6 @@ async function authenticateAdminSession(
     lastSignedIn: new Date(),
     referralCode: null,
   } as User;
-
 }
 
 export async function createContext(
@@ -83,13 +127,21 @@ export async function createContext(
   try {
     user = await sdk.authenticateRequest(opts.req);
   } catch (error) {
-    // OAuth is not available — try the phone-based admin session.
+    // OAuth is not available — try phone-based sessions.
     user = null;
   }
 
   if (!user) {
     try {
       user = await authenticateAdminSession(opts.req.headers.cookie);
+    } catch (error) {
+      user = null;
+    }
+  }
+
+  if (!user) {
+    try {
+      user = await authenticateCustomerSession(opts.req.headers.cookie);
     } catch (error) {
       user = null;
     }
