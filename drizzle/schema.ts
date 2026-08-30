@@ -1,19 +1,43 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, boolean } from "drizzle-orm/mysql-core";
+import {
+  integer,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  varchar,
+  decimal,
+  boolean,
+  serial,
+} from "drizzle-orm/pg-core";
+
+// ─── Enums ──────────────────────────────────────────────────────────────────
+export const roleEnum = pgEnum("role", ["user", "admin", "moderator"]);
+export const isActiveEnum = pgEnum("is_active", ["yes", "no"]);
+export const pricingTypeEnum = pgEnum("pricing_type", ["fixed", "per_meter"]);
+export const orderStatusEnum = pgEnum("order_status", ["new", "contacted", "confirmed", "shipped", "delivered", "cancelled"]);
+export const cancelledByEnum = pgEnum("cancelled_by", ["customer", "admin"]);
+export const notifChannelEnum = pgEnum("notif_channel", ["email", "in_app"]);
+export const notifEventEnum = pgEnum("notif_event", ["status_changed", "customer_cancelled"]);
+export const notifDeliveryEnum = pgEnum("notif_delivery", ["sent", "failed", "in_app", "skipped"]);
+export const discountTypeEnum = pgEnum("discount_type", ["percent", "fixed"]);
+export const adminRoleEnum = pgEnum("admin_role", ["admin", "moderator"]);
+
+// ─── Tables ──────────────────────────────────────────────────────────────────
 
 /**
  * Core user table backing auth flow.
  */
-export const users = mysqlTable("users", {
-  id: int("id").autoincrement().primaryKey(),
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
   phone: varchar("phone", { length: 50 }),
   address: text("address"),
   loginMethod: varchar("loginMethod", { length: 64 }),
-  role: mysqlEnum("role", ["user", "admin", "moderator"]).default("user").notNull(),
+  role: roleEnum("role").default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
   referralCode: varchar("referralCode", { length: 32 }),
 });
@@ -24,24 +48,26 @@ export type InsertUser = typeof users.$inferInsert;
 /**
  * Products table - steel decor items
  */
-export const products = mysqlTable("products", {
-  id: int("id").autoincrement().primaryKey(),
+export const products = pgTable("products", {
+  id: serial("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   nameAr: varchar("nameAr", { length: 255 }).notNull(),
   description: text("description"),
+  descriptionAr: text("descriptionAr"),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   sizes: text("sizes"),
   sizeOptions: text("sizeOptions"),
   colorOptions: text("colorOptions"),
-  pricingType: mysqlEnum("pricingType", ["fixed", "per_meter"]).default("fixed").notNull(),
+  pricingType: pricingTypeEnum("pricingType").default("fixed").notNull(),
   pricePerMeter: decimal("pricePerMeter", { precision: 10, scale: 2 }),
   category: varchar("category", { length: 100 }).default("home-decor"),
   specifications: text("specifications"),
   images: text("images"),
-  isActive: mysqlEnum("isActive", ["yes", "no"]).default("yes").notNull(),
-  sortOrder: int("sortOrder").default(0),
+  featured: boolean("featured").default(false),
+  isActive: isActiveEnum("isActive").default("yes").notNull(),
+  sortOrder: integer("sortOrder").default(0),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
 export type Product = typeof products.$inferSelect;
@@ -50,17 +76,17 @@ export type InsertProduct = typeof products.$inferInsert;
 /**
  * Product categories
  */
-export const categories = mysqlTable("categories", {
-  id: int("id").autoincrement().primaryKey(),
+export const categories = pgTable("categories", {
+  id: serial("id").primaryKey(),
   slug: varchar("slug", { length: 100 }).notNull().unique(),
   nameAr: varchar("nameAr", { length: 120 }).notNull(),
   nameEn: varchar("nameEn", { length: 120 }).notNull(),
   descriptionAr: text("descriptionAr"),
   descriptionEn: text("descriptionEn"),
-  isActive: mysqlEnum("isActive", ["yes", "no"]).default("yes").notNull(),
-  sortOrder: int("sortOrder").default(0),
+  isActive: isActiveEnum("isActive").default("yes").notNull(),
+  sortOrder: integer("sortOrder").default(0),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
 export type Category = typeof categories.$inferSelect;
@@ -69,13 +95,13 @@ export type InsertCategory = typeof categories.$inferInsert;
 /**
  * Orders table
  */
-export const orders = mysqlTable("orders", {
-  id: int("id").autoincrement().primaryKey(),
+export const orders = pgTable("orders", {
+  id: serial("id").primaryKey(),
   customerName: varchar("customerName", { length: 255 }).notNull(),
   customerPhone: varchar("customerPhone", { length: 50 }).notNull(),
   customerEmail: varchar("customerEmail", { length: 320 }),
   customerAddress: text("customerAddress"),
-  productId: int("productId"),
+  productId: integer("productId"),
   productName: varchar("productName", { length: 255 }),
   productPrice: decimal("productPrice", { precision: 10, scale: 2 }),
   selectedSize: varchar("selectedSize", { length: 120 }),
@@ -89,10 +115,10 @@ export const orders = mysqlTable("orders", {
   utmTerm: varchar("utmTerm", { length: 255 }),
   referrer: text("referrer"),
   userAgent: text("userAgent"),
-  status: mysqlEnum("status", ["new", "contacted", "confirmed", "shipped", "delivered", "cancelled"]).default("new").notNull(),
-  cancelledBy: mysqlEnum("cancelledBy", ["customer", "admin"]),
+  status: orderStatusEnum("status").default("new").notNull(),
+  cancelledBy: cancelledByEnum("cancelledBy"),
   cancellationReason: text("cancellationReason"),
-  userId: int("userId"),
+  userId: integer("userId"),
   couponCode: varchar("couponCode", { length: 50 }),
   discountType: varchar("discountType", { length: 20 }),
   discountValue: decimal("discountValue", { precision: 10, scale: 2 }),
@@ -101,7 +127,7 @@ export const orders = mysqlTable("orders", {
   notificationSent: boolean("notificationSent").default(false),
   referralCodeUsed: varchar("referralCodeUsed", { length: 32 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
 export type Order = typeof orders.$inferSelect;
@@ -110,17 +136,17 @@ export type InsertOrder = typeof orders.$inferInsert;
 /**
  * Order Notifications
  */
-export const orderNotifications = mysqlTable("orderNotifications", {
-  id: int("id").autoincrement().primaryKey(),
-  orderId: int("orderId").notNull(),
-  userId: int("userId"),
-  channel: mysqlEnum("channel", ["email", "in_app"]).notNull(),
-  eventType: mysqlEnum("eventType", ["status_changed", "customer_cancelled"]).notNull(),
+export const orderNotifications = pgTable("orderNotifications", {
+  id: serial("id").primaryKey(),
+  orderId: integer("orderId").notNull(),
+  userId: integer("userId"),
+  channel: notifChannelEnum("channel").notNull(),
+  eventType: notifEventEnum("eventType").notNull(),
   status: varchar("status", { length: 32 }).notNull(),
   title: varchar("title", { length: 255 }).notNull(),
   message: text("message").notNull(),
   recipient: varchar("recipient", { length: 320 }),
-  deliveryStatus: mysqlEnum("deliveryStatus", ["sent", "failed", "in_app", "skipped"]).notNull(),
+  deliveryStatus: notifDeliveryEnum("deliveryStatus").notNull(),
   providerMessageId: varchar("providerMessageId", { length: 128 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
@@ -131,12 +157,12 @@ export type InsertOrderNotification = typeof orderNotifications.$inferInsert;
 /**
  * Gallery
  */
-export const gallery = mysqlTable("gallery", {
-  id: int("id").autoincrement().primaryKey(),
+export const gallery = pgTable("gallery", {
+  id: serial("id").primaryKey(),
   title: varchar("title", { length: 255 }).notNull(),
   imageUrl: text("imageUrl").notNull(),
   category: varchar("category", { length: 100 }).default("أعمال منجزة"),
-  sortOrder: int("sortOrder").default(0),
+  sortOrder: integer("sortOrder").default(0),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -146,8 +172,8 @@ export type InsertGalleryItem = typeof gallery.$inferInsert;
 /**
  * Pageviews
  */
-export const pageviews = mysqlTable("pageviews", {
-  id: int("id").autoincrement().primaryKey(),
+export const pageviews = pgTable("pageviews", {
+  id: serial("id").primaryKey(),
   sessionId: varchar("sessionId", { length: 64 }),
   path: varchar("path", { length: 255 }).default("/"),
   referrer: text("referrer"),
@@ -164,8 +190,8 @@ export type InsertPageview = typeof pageviews.$inferInsert;
 /**
  * Site Content
  */
-export const siteContent = mysqlTable("siteContent", {
-  id: int("id").autoincrement().primaryKey(),
+export const siteContent = pgTable("siteContent", {
+  id: serial("id").primaryKey(),
   sectionKey: varchar("sectionKey", { length: 100 }).notNull().unique(),
   titleAr: text("titleAr"),
   titleEn: text("titleEn"),
@@ -173,8 +199,8 @@ export const siteContent = mysqlTable("siteContent", {
   contentEn: text("contentEn"),
   subtitleAr: text("subtitleAr"),
   subtitleEn: text("subtitleEn"),
-  isActive: mysqlEnum("isActive", ["yes", "no"]).default("yes").notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  isActive: isActiveEnum("isActive").default("yes").notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
 export type SiteContent = typeof siteContent.$inferSelect;
@@ -183,20 +209,20 @@ export type InsertSiteContent = typeof siteContent.$inferInsert;
 /**
  * Coupons
  */
-export const coupons = mysqlTable("coupons", {
-  id: int("id").autoincrement().primaryKey(),
+export const coupons = pgTable("coupons", {
+  id: serial("id").primaryKey(),
   code: varchar("code", { length: 50 }).notNull().unique(),
   description: varchar("description", { length: 255 }),
-  discountType: mysqlEnum("discountType", ["percent", "fixed"]).notNull(),
+  discountType: discountTypeEnum("discountType").notNull(),
   discountValue: decimal("discountValue", { precision: 10, scale: 2 }).notNull(),
   minOrderValue: decimal("minOrderValue", { precision: 10, scale: 2 }).default("0"),
-  maxUsage: int("maxUsage"),
-  usedCount: int("usedCount").default(0).notNull(),
-  isActive: mysqlEnum("isActive", ["yes", "no"]).default("yes").notNull(),
+  maxUsage: integer("maxUsage"),
+  usedCount: integer("usedCount").default(0).notNull(),
+  isActive: isActiveEnum("isActive").default("yes").notNull(),
   startsAt: timestamp("startsAt"),
   expiresAt: timestamp("expiresAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
 export type Coupon = typeof coupons.$inferSelect;
@@ -205,16 +231,16 @@ export type InsertCoupon = typeof coupons.$inferInsert;
 /**
  * Product reviews
  */
-export const productReviews = mysqlTable("productReviews", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
-  productId: int("productId").notNull(),
-  orderId: int("orderId"),
-  rating: int("rating").notNull(),
+export const productReviews = pgTable("productReviews", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull(),
+  productId: integer("productId").notNull(),
+  orderId: integer("orderId"),
+  rating: integer("rating").notNull(),
   comment: text("comment"),
   userName: varchar("userName", { length: 255 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
 export type ProductReview = typeof productReviews.$inferSelect;
@@ -223,15 +249,15 @@ export type InsertProductReview = typeof productReviews.$inferInsert;
 /**
  * Admin credentials
  */
-export const adminCredentials = mysqlTable("adminCredentials", {
-  id: int("id").autoincrement().primaryKey(),
+export const adminCredentials = pgTable("adminCredentials", {
+  id: serial("id").primaryKey(),
   phone: varchar("phone", { length: 30 }).notNull().unique(),
   passwordHash: varchar("passwordHash", { length: 255 }).notNull(),
   displayName: varchar("displayName", { length: 255 }),
-  role: mysqlEnum("role", ["admin", "moderator"]).default("admin").notNull(),
-  isActive: mysqlEnum("isActive", ["yes", "no"]).default("yes").notNull(),
+  role: adminRoleEnum("role").default("admin").notNull(),
+  isActive: isActiveEnum("isActive").default("yes").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
 export type AdminCredential = typeof adminCredentials.$inferSelect;
@@ -240,8 +266,8 @@ export type InsertAdminCredential = typeof adminCredentials.$inferInsert;
 /**
  * Admin sessions
  */
-export const adminSessions = mysqlTable("adminSessions", {
-  id: int("id").autoincrement().primaryKey(),
+export const adminSessions = pgTable("adminSessions", {
+  id: serial("id").primaryKey(),
   adminPhone: varchar("adminPhone", { length: 30 }).notNull(),
   jti: varchar("jti", { length: 64 }).notNull().unique(),
   userAgent: text("userAgent"),
@@ -256,8 +282,8 @@ export type InsertAdminSession = typeof adminSessions.$inferInsert;
 /**
  * Admin login attempts
  */
-export const adminLoginAttempts = mysqlTable("adminLoginAttempts", {
-  id: int("id").autoincrement().primaryKey(),
+export const adminLoginAttempts = pgTable("adminLoginAttempts", {
+  id: serial("id").primaryKey(),
   ip: varchar("ip", { length: 60 }),
   phone: varchar("phone", { length: 30 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -269,11 +295,11 @@ export type InsertAdminLoginAttempt = typeof adminLoginAttempts.$inferInsert;
 /**
  * Site settings
  */
-export const siteSettings = mysqlTable("siteSettings", {
-  id: int("id").autoincrement().primaryKey(),
+export const siteSettings = pgTable("siteSettings", {
+  id: serial("id").primaryKey(),
   settingKey: varchar("settingKey", { length: 64 }).notNull().unique(),
   settingValue: text("settingValue"),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
 export type SiteSetting = typeof siteSettings.$inferSelect;
@@ -282,9 +308,9 @@ export type InsertSiteSetting = typeof siteSettings.$inferInsert;
 /**
  * Restock alerts
  */
-export const restockAlerts = mysqlTable("restockAlerts", {
-  id: int("id").autoincrement().primaryKey(),
-  productId: int("productId").notNull(),
+export const restockAlerts = pgTable("restockAlerts", {
+  id: serial("id").primaryKey(),
+  productId: integer("productId").notNull(),
   productName: varchar("productName", { length: 255 }),
   size: varchar("size", { length: 120 }).notNull(),
   email: varchar("email", { length: 320 }),
@@ -299,8 +325,8 @@ export type InsertRestockAlert = typeof restockAlerts.$inferInsert;
 /**
  * Contact inbox
  */
-export const contactInbox = mysqlTable("contactInbox", {
-  id: int("id").autoincrement().primaryKey(),
+export const contactInbox = pgTable("contactInbox", {
+  id: serial("id").primaryKey(),
   name: varchar("name", { length: 160 }).notNull(),
   phone: varchar("phone", { length: 40 }),
   email: varchar("email", { length: 180 }),

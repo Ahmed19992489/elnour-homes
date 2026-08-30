@@ -13,11 +13,13 @@ export default function OffersPage() {
     description: "استمتع بأقوى عروض وتخفيضات ديكورات الاستيل الفاخرة من Elnour Homes لفترة محدودة.",
   });
 
-  const { data: products, isLoading } = trpc.products.list.useQuery();
-  const { data: categories } = trpc.categories.list.useQuery();
+  const { data: rawProducts, isLoading } = trpc.products.list.useQuery();
+  const { data: rawCategories } = trpc.categories.list.useQuery();
 
-  // Filter featured products or offer products
-  const offerProducts = products?.filter((p) => p.featured) || products || [];
+  const products = Array.isArray(rawProducts) ? rawProducts : [];
+  const categories = Array.isArray(rawCategories) ? rawCategories : [];
+
+  const offerProducts = products.length > 0 ? products : [];
 
   return (
     <PublicLayout>
@@ -51,7 +53,7 @@ export default function OffersPage() {
                 key={product.id}
                 product={product}
                 categoryName={
-                  categories?.find((c) => c.slug === product.category)?.[
+                  categories.find((c: any) => c.slug === product.category)?.[
                     lang === "ar" ? "nameAr" : "nameEn"
                   ]
                 }
@@ -59,8 +61,8 @@ export default function OffersPage() {
             ))}
           </div>
         ) : (
-          <div className="rounded-3xl border border-dashed border-[#ddd6c8] bg-white p-16 text-center">
-            <p className="font-bold text-lg">{t("تابعونا قريباً للمزيد من العروض الحصرية", "Stay tuned for more exclusive offers soon")}</p>
+          <div className="rounded-3xl border border-dashed border-[#ddd6c8] bg-white p-12 text-center text-muted-foreground">
+            {t("لا توجد عروض مضافة حالياً. تابعنا قريباً!", "No current offers. Check back soon!")}
           </div>
         )}
       </section>

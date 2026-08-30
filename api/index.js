@@ -70,63 +70,86 @@ var ENV = {
 };
 
 // server/db.ts
-import { and, desc, eq, gt } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
+import { eq } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/neon-http";
+import { neon } from "@neondatabase/serverless";
 
 // drizzle/schema.ts
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, boolean } from "drizzle-orm/mysql-core";
-var users = mysqlTable("users", {
-  id: int("id").autoincrement().primaryKey(),
+import {
+  integer,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  varchar,
+  decimal,
+  boolean,
+  serial
+} from "drizzle-orm/pg-core";
+var roleEnum = pgEnum("role", ["user", "admin", "moderator"]);
+var isActiveEnum = pgEnum("is_active", ["yes", "no"]);
+var pricingTypeEnum = pgEnum("pricing_type", ["fixed", "per_meter"]);
+var orderStatusEnum = pgEnum("order_status", ["new", "contacted", "confirmed", "shipped", "delivered", "cancelled"]);
+var cancelledByEnum = pgEnum("cancelled_by", ["customer", "admin"]);
+var notifChannelEnum = pgEnum("notif_channel", ["email", "in_app"]);
+var notifEventEnum = pgEnum("notif_event", ["status_changed", "customer_cancelled"]);
+var notifDeliveryEnum = pgEnum("notif_delivery", ["sent", "failed", "in_app", "skipped"]);
+var discountTypeEnum = pgEnum("discount_type", ["percent", "fixed"]);
+var adminRoleEnum = pgEnum("admin_role", ["admin", "moderator"]);
+var users = pgTable("users", {
+  id: serial("id").primaryKey(),
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
   phone: varchar("phone", { length: 50 }),
   address: text("address"),
   loginMethod: varchar("loginMethod", { length: 64 }),
-  role: mysqlEnum("role", ["user", "admin", "moderator"]).default("user").notNull(),
+  role: roleEnum("role").default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
   referralCode: varchar("referralCode", { length: 32 })
 });
-var products = mysqlTable("products", {
-  id: int("id").autoincrement().primaryKey(),
+var products = pgTable("products", {
+  id: serial("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   nameAr: varchar("nameAr", { length: 255 }).notNull(),
   description: text("description"),
+  descriptionAr: text("descriptionAr"),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   sizes: text("sizes"),
   sizeOptions: text("sizeOptions"),
   colorOptions: text("colorOptions"),
-  pricingType: mysqlEnum("pricingType", ["fixed", "per_meter"]).default("fixed").notNull(),
+  pricingType: pricingTypeEnum("pricingType").default("fixed").notNull(),
   pricePerMeter: decimal("pricePerMeter", { precision: 10, scale: 2 }),
   category: varchar("category", { length: 100 }).default("home-decor"),
   specifications: text("specifications"),
   images: text("images"),
-  isActive: mysqlEnum("isActive", ["yes", "no"]).default("yes").notNull(),
-  sortOrder: int("sortOrder").default(0),
+  featured: boolean("featured").default(false),
+  isActive: isActiveEnum("isActive").default("yes").notNull(),
+  sortOrder: integer("sortOrder").default(0),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
+  updatedAt: timestamp("updatedAt").defaultNow().notNull()
 });
-var categories = mysqlTable("categories", {
-  id: int("id").autoincrement().primaryKey(),
+var categories = pgTable("categories", {
+  id: serial("id").primaryKey(),
   slug: varchar("slug", { length: 100 }).notNull().unique(),
   nameAr: varchar("nameAr", { length: 120 }).notNull(),
   nameEn: varchar("nameEn", { length: 120 }).notNull(),
   descriptionAr: text("descriptionAr"),
   descriptionEn: text("descriptionEn"),
-  isActive: mysqlEnum("isActive", ["yes", "no"]).default("yes").notNull(),
-  sortOrder: int("sortOrder").default(0),
+  isActive: isActiveEnum("isActive").default("yes").notNull(),
+  sortOrder: integer("sortOrder").default(0),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
+  updatedAt: timestamp("updatedAt").defaultNow().notNull()
 });
-var orders = mysqlTable("orders", {
-  id: int("id").autoincrement().primaryKey(),
+var orders = pgTable("orders", {
+  id: serial("id").primaryKey(),
   customerName: varchar("customerName", { length: 255 }).notNull(),
   customerPhone: varchar("customerPhone", { length: 50 }).notNull(),
   customerEmail: varchar("customerEmail", { length: 320 }),
   customerAddress: text("customerAddress"),
-  productId: int("productId"),
+  productId: integer("productId"),
   productName: varchar("productName", { length: 255 }),
   productPrice: decimal("productPrice", { precision: 10, scale: 2 }),
   selectedSize: varchar("selectedSize", { length: 120 }),
@@ -140,10 +163,10 @@ var orders = mysqlTable("orders", {
   utmTerm: varchar("utmTerm", { length: 255 }),
   referrer: text("referrer"),
   userAgent: text("userAgent"),
-  status: mysqlEnum("status", ["new", "contacted", "confirmed", "shipped", "delivered", "cancelled"]).default("new").notNull(),
-  cancelledBy: mysqlEnum("cancelledBy", ["customer", "admin"]),
+  status: orderStatusEnum("status").default("new").notNull(),
+  cancelledBy: cancelledByEnum("cancelledBy"),
   cancellationReason: text("cancellationReason"),
-  userId: int("userId"),
+  userId: integer("userId"),
   couponCode: varchar("couponCode", { length: 50 }),
   discountType: varchar("discountType", { length: 20 }),
   discountValue: decimal("discountValue", { precision: 10, scale: 2 }),
@@ -152,32 +175,32 @@ var orders = mysqlTable("orders", {
   notificationSent: boolean("notificationSent").default(false),
   referralCodeUsed: varchar("referralCodeUsed", { length: 32 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
+  updatedAt: timestamp("updatedAt").defaultNow().notNull()
 });
-var orderNotifications = mysqlTable("orderNotifications", {
-  id: int("id").autoincrement().primaryKey(),
-  orderId: int("orderId").notNull(),
-  userId: int("userId"),
-  channel: mysqlEnum("channel", ["email", "in_app"]).notNull(),
-  eventType: mysqlEnum("eventType", ["status_changed", "customer_cancelled"]).notNull(),
+var orderNotifications = pgTable("orderNotifications", {
+  id: serial("id").primaryKey(),
+  orderId: integer("orderId").notNull(),
+  userId: integer("userId"),
+  channel: notifChannelEnum("channel").notNull(),
+  eventType: notifEventEnum("eventType").notNull(),
   status: varchar("status", { length: 32 }).notNull(),
   title: varchar("title", { length: 255 }).notNull(),
   message: text("message").notNull(),
   recipient: varchar("recipient", { length: 320 }),
-  deliveryStatus: mysqlEnum("deliveryStatus", ["sent", "failed", "in_app", "skipped"]).notNull(),
+  deliveryStatus: notifDeliveryEnum("deliveryStatus").notNull(),
   providerMessageId: varchar("providerMessageId", { length: 128 }),
   createdAt: timestamp("createdAt").defaultNow().notNull()
 });
-var gallery = mysqlTable("gallery", {
-  id: int("id").autoincrement().primaryKey(),
+var gallery = pgTable("gallery", {
+  id: serial("id").primaryKey(),
   title: varchar("title", { length: 255 }).notNull(),
   imageUrl: text("imageUrl").notNull(),
   category: varchar("category", { length: 100 }).default("\u0623\u0639\u0645\u0627\u0644 \u0645\u0646\u062C\u0632\u0629"),
-  sortOrder: int("sortOrder").default(0),
+  sortOrder: integer("sortOrder").default(0),
   createdAt: timestamp("createdAt").defaultNow().notNull()
 });
-var pageviews = mysqlTable("pageviews", {
-  id: int("id").autoincrement().primaryKey(),
+var pageviews = pgTable("pageviews", {
+  id: serial("id").primaryKey(),
   sessionId: varchar("sessionId", { length: 64 }),
   path: varchar("path", { length: 255 }).default("/"),
   referrer: text("referrer"),
@@ -187,8 +210,8 @@ var pageviews = mysqlTable("pageviews", {
   utmCampaign: varchar("utmCampaign", { length: 255 }),
   createdAt: timestamp("createdAt").defaultNow().notNull()
 });
-var siteContent = mysqlTable("siteContent", {
-  id: int("id").autoincrement().primaryKey(),
+var siteContent = pgTable("siteContent", {
+  id: serial("id").primaryKey(),
   sectionKey: varchar("sectionKey", { length: 100 }).notNull().unique(),
   titleAr: text("titleAr"),
   titleEn: text("titleEn"),
@@ -196,47 +219,47 @@ var siteContent = mysqlTable("siteContent", {
   contentEn: text("contentEn"),
   subtitleAr: text("subtitleAr"),
   subtitleEn: text("subtitleEn"),
-  isActive: mysqlEnum("isActive", ["yes", "no"]).default("yes").notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
+  isActive: isActiveEnum("isActive").default("yes").notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull()
 });
-var coupons = mysqlTable("coupons", {
-  id: int("id").autoincrement().primaryKey(),
+var coupons = pgTable("coupons", {
+  id: serial("id").primaryKey(),
   code: varchar("code", { length: 50 }).notNull().unique(),
   description: varchar("description", { length: 255 }),
-  discountType: mysqlEnum("discountType", ["percent", "fixed"]).notNull(),
+  discountType: discountTypeEnum("discountType").notNull(),
   discountValue: decimal("discountValue", { precision: 10, scale: 2 }).notNull(),
   minOrderValue: decimal("minOrderValue", { precision: 10, scale: 2 }).default("0"),
-  maxUsage: int("maxUsage"),
-  usedCount: int("usedCount").default(0).notNull(),
-  isActive: mysqlEnum("isActive", ["yes", "no"]).default("yes").notNull(),
+  maxUsage: integer("maxUsage"),
+  usedCount: integer("usedCount").default(0).notNull(),
+  isActive: isActiveEnum("isActive").default("yes").notNull(),
   startsAt: timestamp("startsAt"),
   expiresAt: timestamp("expiresAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
+  updatedAt: timestamp("updatedAt").defaultNow().notNull()
 });
-var productReviews = mysqlTable("productReviews", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull(),
-  productId: int("productId").notNull(),
-  orderId: int("orderId"),
-  rating: int("rating").notNull(),
+var productReviews = pgTable("productReviews", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull(),
+  productId: integer("productId").notNull(),
+  orderId: integer("orderId"),
+  rating: integer("rating").notNull(),
   comment: text("comment"),
   userName: varchar("userName", { length: 255 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
+  updatedAt: timestamp("updatedAt").defaultNow().notNull()
 });
-var adminCredentials = mysqlTable("adminCredentials", {
-  id: int("id").autoincrement().primaryKey(),
+var adminCredentials = pgTable("adminCredentials", {
+  id: serial("id").primaryKey(),
   phone: varchar("phone", { length: 30 }).notNull().unique(),
   passwordHash: varchar("passwordHash", { length: 255 }).notNull(),
   displayName: varchar("displayName", { length: 255 }),
-  role: mysqlEnum("role", ["admin", "moderator"]).default("admin").notNull(),
-  isActive: mysqlEnum("isActive", ["yes", "no"]).default("yes").notNull(),
+  role: adminRoleEnum("role").default("admin").notNull(),
+  isActive: isActiveEnum("isActive").default("yes").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
+  updatedAt: timestamp("updatedAt").defaultNow().notNull()
 });
-var adminSessions = mysqlTable("adminSessions", {
-  id: int("id").autoincrement().primaryKey(),
+var adminSessions = pgTable("adminSessions", {
+  id: serial("id").primaryKey(),
   adminPhone: varchar("adminPhone", { length: 30 }).notNull(),
   jti: varchar("jti", { length: 64 }).notNull().unique(),
   userAgent: text("userAgent"),
@@ -244,21 +267,21 @@ var adminSessions = mysqlTable("adminSessions", {
   expiresAt: timestamp("expiresAt").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull()
 });
-var adminLoginAttempts = mysqlTable("adminLoginAttempts", {
-  id: int("id").autoincrement().primaryKey(),
+var adminLoginAttempts = pgTable("adminLoginAttempts", {
+  id: serial("id").primaryKey(),
   ip: varchar("ip", { length: 60 }),
   phone: varchar("phone", { length: 30 }),
   createdAt: timestamp("createdAt").defaultNow().notNull()
 });
-var siteSettings = mysqlTable("siteSettings", {
-  id: int("id").autoincrement().primaryKey(),
+var siteSettings = pgTable("siteSettings", {
+  id: serial("id").primaryKey(),
   settingKey: varchar("settingKey", { length: 64 }).notNull().unique(),
   settingValue: text("settingValue"),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull()
+  updatedAt: timestamp("updatedAt").defaultNow().notNull()
 });
-var restockAlerts = mysqlTable("restockAlerts", {
-  id: int("id").autoincrement().primaryKey(),
-  productId: int("productId").notNull(),
+var restockAlerts = pgTable("restockAlerts", {
+  id: serial("id").primaryKey(),
+  productId: integer("productId").notNull(),
   productName: varchar("productName", { length: 255 }),
   size: varchar("size", { length: 120 }).notNull(),
   email: varchar("email", { length: 320 }),
@@ -266,8 +289,8 @@ var restockAlerts = mysqlTable("restockAlerts", {
   sentAt: timestamp("sentAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull()
 });
-var contactInbox = mysqlTable("contactInbox", {
-  id: int("id").autoincrement().primaryKey(),
+var contactInbox = pgTable("contactInbox", {
+  id: serial("id").primaryKey(),
   name: varchar("name", { length: 160 }).notNull(),
   phone: varchar("phone", { length: 40 }),
   email: varchar("email", { length: 180 }),
@@ -279,12 +302,14 @@ var contactInbox = mysqlTable("contactInbox", {
 
 // server/db.ts
 var _db = null;
-async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
+function getDb() {
+  if (!_db) {
+    const url = process.env.DATABASE_URL || "postgresql://neondb_owner:npg_VM4tSBwN5PGd@ep-plain-rice-auzortld-pooler.c-10.us-east-1.aws.neon.tech/neondb?sslmode=require";
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      const client = neon(url);
+      _db = drizzle(client);
     } catch (error) {
-      console.warn("[Database] Connection notice:", error);
+      console.warn("[Database] Connection error:", error);
       _db = null;
     }
   }
@@ -294,7 +319,7 @@ function normalizePhone(phone) {
   return (phone || "").replace(/[^0-9]/g, "");
 }
 async function getUserByOpenId(openId) {
-  const db = await getDb();
+  const db = getDb();
   if (!db) return void 0;
   try {
     const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
@@ -304,58 +329,65 @@ async function getUserByOpenId(openId) {
   }
 }
 async function getAdminCredentialByPhone(phone) {
-  const db = await getDb();
+  const db = getDb();
   if (!db) return void 0;
   try {
-    const result = await db.select().from(adminCredentials).where(eq(adminCredentials.phone, normalizePhone(phone))).limit(1);
+    const result = await db.select().from(adminCredentials).where(eq(adminCredentials.phone, phone)).limit(1);
     return result[0];
   } catch {
     return void 0;
   }
 }
-async function upsertAdminCredential(data) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  const normalized = { ...data, phone: normalizePhone(data.phone) };
-  await db.insert(adminCredentials).values(normalized).onDuplicateKeyUpdate({
-    set: {
-      passwordHash: normalized.passwordHash,
-      displayName: normalized.displayName ?? null,
-      role: normalized.role ?? "admin",
-      isActive: "yes"
-    }
-  });
-  return getAdminCredentialByPhone(normalized.phone);
-}
-async function createAdminSession(data) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  await db.insert(adminSessions).values(data);
-  return data.jti;
-}
-async function getActiveAdminSession(jti, now) {
-  const db = await getDb();
-  if (!db) return void 0;
+async function upsertAdminCredential(cred) {
+  const db = getDb();
+  if (!db) return;
   try {
-    const result = await db.select().from(adminSessions).where(and(eq(adminSessions.jti, jti), gt(adminSessions.expiresAt, now))).limit(1);
-    return result[0];
-  } catch {
-    return void 0;
+    const existing = await getAdminCredentialByPhone(cred.phone);
+    if (existing) {
+      await db.update(adminCredentials).set(cred).where(eq(adminCredentials.phone, cred.phone));
+    } else {
+      await db.insert(adminCredentials).values(cred);
+    }
+  } catch (e) {
+    console.error("upsertAdminCredential error:", e);
   }
 }
 async function getAllAdminCredentials() {
-  const db = await getDb();
+  const db = getDb();
   if (!db) return [];
   try {
-    return await db.select().from(adminCredentials).orderBy(desc(adminCredentials.createdAt));
+    return await db.select().from(adminCredentials);
   } catch {
     return [];
   }
 }
 async function deleteAdminCredential(phone) {
-  const db = await getDb();
-  if (!db) throw new Error("Database not available");
-  await db.delete(adminCredentials).where(eq(adminCredentials.phone, normalizePhone(phone)));
+  const db = getDb();
+  if (!db) return;
+  try {
+    await db.delete(adminCredentials).where(eq(adminCredentials.phone, phone));
+  } catch (e) {
+    console.error("deleteAdminCredential error:", e);
+  }
+}
+async function createAdminSession(session) {
+  const db = getDb();
+  if (!db) return;
+  try {
+    await db.insert(adminSessions).values(session);
+  } catch (e) {
+    console.error("createAdminSession error:", e);
+  }
+}
+async function getActiveAdminSession(jti) {
+  const db = getDb();
+  if (!db) return void 0;
+  try {
+    const result = await db.select().from(adminSessions).where(eq(adminSessions.jti, jti)).limit(1);
+    return result[0];
+  } catch {
+    return void 0;
+  }
 }
 
 // server/storage.ts
@@ -374,7 +406,7 @@ async function storagePut(relKey, data, contentType = "image/jpeg") {
 }
 
 // server/routers.ts
-import { desc as desc2, eq as eq2 } from "drizzle-orm";
+import { desc, eq as eq2 } from "drizzle-orm";
 var adminProcedure = protectedProcedure.use(async ({ ctx, next }) => {
   if (!ctx.user || ctx.user.role !== "admin" && ctx.user.role !== "moderator") {
     throw new TRPCError2({ code: "UNAUTHORIZED", message: "Admin or Moderator access required" });
@@ -504,7 +536,7 @@ var appRouter = router({
       const database = await getDb();
       if (!database) return [];
       try {
-        return await database.select().from(products).orderBy(desc2(products.createdAt));
+        return await database.select().from(products).orderBy(desc(products.createdAt));
       } catch {
         return [];
       }
@@ -710,7 +742,7 @@ var appRouter = router({
       const database = await getDb();
       if (!database) return [];
       try {
-        return await database.select().from(orders).orderBy(desc2(orders.createdAt));
+        return await database.select().from(orders).orderBy(desc(orders.createdAt));
       } catch {
         return [];
       }
@@ -810,7 +842,7 @@ var appRouter = router({
       const database = await getDb();
       if (!database) return [];
       try {
-        return await database.select().from(gallery).orderBy(desc2(gallery.createdAt));
+        return await database.select().from(gallery).orderBy(desc(gallery.createdAt));
       } catch {
         return [];
       }
@@ -859,7 +891,7 @@ var appRouter = router({
       const database = await getDb();
       if (!database) return [];
       try {
-        return await database.select().from(coupons).orderBy(desc2(coupons.createdAt));
+        return await database.select().from(coupons).orderBy(desc(coupons.createdAt));
       } catch {
         return [];
       }
@@ -925,7 +957,7 @@ var appRouter = router({
       const database = await getDb();
       if (!database) return [];
       try {
-        return await database.select().from(productReviews).orderBy(desc2(productReviews.createdAt));
+        return await database.select().from(productReviews).orderBy(desc(productReviews.createdAt));
       } catch {
         return [];
       }
@@ -934,7 +966,7 @@ var appRouter = router({
       const database = await getDb();
       if (!database) return [];
       try {
-        return await database.select().from(productReviews).where(eq2(productReviews.productId, input.productId)).orderBy(desc2(productReviews.createdAt));
+        return await database.select().from(productReviews).where(eq2(productReviews.productId, input.productId)).orderBy(desc(productReviews.createdAt));
       } catch {
         return [];
       }
@@ -943,7 +975,7 @@ var appRouter = router({
       const database = await getDb();
       if (!database) return [];
       try {
-        return await database.select().from(productReviews).where(eq2(productReviews.productId, input.productId)).orderBy(desc2(productReviews.createdAt));
+        return await database.select().from(productReviews).where(eq2(productReviews.productId, input.productId)).orderBy(desc(productReviews.createdAt));
       } catch {
         return [];
       }
@@ -952,7 +984,7 @@ var appRouter = router({
       const database = await getDb();
       if (!database) return [];
       try {
-        return await database.select().from(productReviews).orderBy(desc2(productReviews.createdAt));
+        return await database.select().from(productReviews).orderBy(desc(productReviews.createdAt));
       } catch {
         return [];
       }
@@ -1039,7 +1071,7 @@ var appRouter = router({
       const database = await getDb();
       if (!database) return [];
       try {
-        return await database.select().from(restockAlerts).orderBy(desc2(restockAlerts.createdAt));
+        return await database.select().from(restockAlerts).orderBy(desc(restockAlerts.createdAt));
       } catch {
         return [];
       }
@@ -1052,7 +1084,7 @@ var appRouter = router({
       const database = await getDb();
       if (!database) return [];
       try {
-        return await database.select().from(restockAlerts).orderBy(desc2(restockAlerts.createdAt));
+        return await database.select().from(restockAlerts).orderBy(desc(restockAlerts.createdAt));
       } catch {
         return [];
       }

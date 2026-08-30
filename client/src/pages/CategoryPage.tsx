@@ -13,9 +13,11 @@ export default function CategoryPage() {
   const { lang, isRTL, t } = useLanguage();
 
   const { data: category, isLoading: catLoading } = trpc.categories.bySlug.useQuery({ slug: slug || "" });
-  const { data: products, isLoading: prodLoading } = trpc.products.byCategory.useQuery({ category: slug || "" });
+  const { data: rawProducts, isLoading: prodLoading } = trpc.products.byCategory.useQuery({ category: slug || "", slug: slug || "" });
 
-  const catName = category ? (lang === "ar" ? category.nameAr : category.nameEn) : slug;
+  const products = Array.isArray(rawProducts) ? rawProducts : [];
+
+  const catName = category ? (lang === "ar" ? category.nameAr : category.nameEn) : (slug || "القسم");
   const catDesc = category ? (lang === "ar" ? category.descriptionAr : category.descriptionEn) : "";
 
   UpdateHead({
@@ -53,7 +55,7 @@ export default function CategoryPage() {
           <div className="flex justify-center py-20">
             <Loader2 className="h-10 w-10 animate-spin text-[#d5af58]" />
           </div>
-        ) : products && products.length > 0 ? (
+        ) : products.length > 0 ? (
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {products.map((product) => (
               <ProductCard
@@ -64,16 +66,16 @@ export default function CategoryPage() {
             ))}
           </div>
         ) : (
-          <div className="rounded-3xl border border-dashed border-[#ddd6c8] bg-white p-16 text-center">
-            <p className="text-lg font-bold text-[#24211d]">
-              {t("لا توجد منتجات مضافة في هذه الفئة حالياً", "No products available in this category yet")}
-            </p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {t("تصفح الكتالوج الكامل لاكتشاف باقي التشكيلات المتاحة.", "Browse the full catalog to explore other collections.")}
+          <div className="rounded-3xl border border-dashed border-[#ddd6c8] bg-white p-16 text-center max-w-md mx-auto space-y-4">
+            <h3 className="text-xl font-bold text-[#24211d]">
+              {t("لا توجد منتجات في هذا القسم حالياً", "No products in this category yet")}
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              {t("تابعنا قريباً لإضافة موديلات جديدة أو تواصل معنا لتفصيل طلبك الخاص.", "Check back soon or contact us directly for custom fabrication.")}
             </p>
             <Link href="/products">
-              <Button className="mt-6 bg-[#24211d] text-white hover:bg-[#a8822d] font-bold">
-                {t("تصفح جميع المنتجات", "Explore All Products")}
+              <Button className="bg-[#24211d] text-white hover:bg-[#a8822d] font-bold rounded-xl">
+                {t("تصفح باقي الأقسام", "Browse Other Categories")}
               </Button>
             </Link>
           </div>

@@ -16,10 +16,13 @@ export default function WishlistPage() {
   });
 
   const { items: wishlistIds } = useWishlist();
-  const { data: allProducts, isLoading } = trpc.products.list.useQuery();
-  const { data: categories } = trpc.categories.list.useQuery();
+  const { data: rawProducts, isLoading } = trpc.products.list.useQuery();
+  const { data: rawCategories } = trpc.categories.list.useQuery();
 
-  const favoriteProducts = allProducts?.filter((p) => wishlistIds.includes(p.id)) || [];
+  const allProducts = Array.isArray(rawProducts) ? rawProducts : [];
+  const categories = Array.isArray(rawCategories) ? rawCategories : [];
+
+  const favoriteProducts = allProducts.filter((p) => wishlistIds.includes(p.id));
 
   return (
     <PublicLayout>
@@ -40,7 +43,7 @@ export default function WishlistPage() {
               {t("اضغط على أيقونة القلب في أي منتج لحفظه والرجوع إليه في أي وقت.", "Click the heart icon on any product to save it for later.")}
             </p>
             <Link href="/products">
-              <Button className="mt-4 bg-[#24211d] text-white hover:bg-[#a8822d] font-bold rounded-xl px-8">
+              <Button className="mt-4 bg-[#24211d] text-white hover:bg-[#a8822d] font-bold rounded-xl px-8 cursor-pointer">
                 {t("تصفح المنتجات الآن", "Browse Products")}
               </Button>
             </Link>
@@ -56,7 +59,7 @@ export default function WishlistPage() {
                 key={product.id}
                 product={product}
                 categoryName={
-                  categories?.find((c) => c.slug === product.category)?.[
+                  categories.find((c: any) => c.slug === product.category)?.[
                     lang === "ar" ? "nameAr" : "nameEn"
                   ]
                 }

@@ -2,20 +2,20 @@ import React from "react";
 import { Link } from "wouter";
 import PublicLayout from "@/components/storefront/PublicLayout";
 import ProductCard from "@/components/storefront/ProductCard";
-import { trpc } from "@/lib/trpc";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { UpdateHead } from "@/components/UpdateHead";
+import { trpc } from "@/lib/trpc";
 import {
   Sparkles,
-  ArrowLeft,
   ShieldCheck,
-  Award,
   Truck,
-  MessageCircle,
-  Phone,
   Layers,
-  Star,
   CheckCircle2,
+  ArrowLeft,
+  Phone,
+  MessageCircle,
+  Clock,
+  Award,
   Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -30,11 +30,16 @@ export default function Home() {
     description: "متجر ومصنع Elnour Homes المتخصص في أرقى ديكورات وترابيزات الاستيل 304، مرايات ليد، كونسول، وقواطع جدارية فاخرة بأعلى جودة وضمان حقيقي.",
   });
 
-  const { data: products, isLoading: prodLoading } = trpc.products.list.useQuery();
-  const { data: categories, isLoading: catLoading } = trpc.categories.list.useQuery();
-  const { data: galleryItems } = trpc.gallery.list.useQuery();
+  const { data: rawProducts, isLoading: prodLoading } = trpc.products.list.useQuery();
+  const { data: rawCategories, isLoading: catLoading } = trpc.categories.list.useQuery();
+  const { data: rawGallery } = trpc.gallery.list.useQuery();
 
-  const featuredProducts = products?.filter((p) => p.featured) || products?.slice(0, 4) || [];
+  const products = Array.isArray(rawProducts) ? rawProducts : [];
+  const categories = Array.isArray(rawCategories) ? rawCategories : [];
+  const galleryItems = Array.isArray(rawGallery) ? rawGallery : [];
+
+  const featuredList = products.filter((p: any) => p.featured || p.isActive === "yes");
+  const featuredProducts = featuredList.length > 0 ? featuredList.slice(0, 8) : products.slice(0, 4);
 
   return (
     <PublicLayout>
@@ -62,7 +67,7 @@ export default function Home() {
 
             <div className="flex flex-wrap items-center gap-4 pt-4">
               <Link href="/products">
-                <Button size="lg" className="bg-[#d5af58] text-[#24211d] hover:bg-[#e0be6c] font-black px-8 h-14 rounded-2xl shadow-xl text-base">
+                <Button size="lg" className="bg-[#d5af58] text-[#24211d] hover:bg-[#e0be6c] font-black px-8 h-14 rounded-2xl shadow-xl text-base cursor-pointer">
                   {t("تصفح الكتالوج والمنتجات", "Explore Catalogue")}
                   <ArrowLeft className={`h-4 w-4 ${isRTL ? "mr-2" : "ml-2 rotate-180"}`} />
                 </Button>
@@ -73,7 +78,7 @@ export default function Home() {
                 target="_blank"
                 rel="noreferrer"
               >
-                <Button size="lg" variant="outline" className="border-[#d5af58]/60 text-[#f8f5ee] hover:bg-white/10 font-bold px-6 h-14 rounded-2xl">
+                <Button size="lg" variant="outline" className="border-[#d5af58]/60 text-[#f8f5ee] hover:bg-white/10 font-bold px-6 h-14 rounded-2xl cursor-pointer">
                   <MessageCircle className="ml-2 h-5 w-5 text-emerald-400" />
                   {t("طلب مقاس وتفصيل خاص", "Custom Inquiry")}
                 </Button>
@@ -125,7 +130,7 @@ export default function Home() {
                   </a>
                 </div>
                 <Link href="/work">
-                  <Button size="sm" variant="ghost" className="text-xs text-white hover:text-[#d5af58] font-bold">
+                  <Button size="sm" variant="ghost" className="text-xs text-white hover:text-[#d5af58] font-bold cursor-pointer">
                     {t("شاهد سابقة الأعمال", "View Gallery")}
                     <ArrowLeft className={`h-3.5 w-3.5 ${isRTL ? "mr-1" : "ml-1 rotate-180"}`} />
                   </Button>
@@ -148,7 +153,7 @@ export default function Home() {
             </h2>
           </div>
           <Link href="/products">
-            <Button variant="outline" className="font-bold border-[#d5af58] text-[#a8822d] hover:bg-[#d5af58]/10 rounded-xl">
+            <Button variant="outline" className="font-bold border-[#d5af58] text-[#a8822d] hover:bg-[#d5af58]/10 rounded-xl cursor-pointer">
               {t("عرض الكتالوج بالكامل", "View Full Catalogue")}
               <ArrowLeft className={`h-4 w-4 ${isRTL ? "mr-2" : "ml-2 rotate-180"}`} />
             </Button>
@@ -161,8 +166,16 @@ export default function Home() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {categories?.map((cat) => (
-              <Link key={cat.id} href={`/products/${cat.slug}`} className="group">
+            {(categories.length > 0
+              ? categories
+              : [
+                  { id: 1, slug: "tables", nameAr: "ترابيزات استيل", nameEn: "Steel Tables", descriptionAr: "ترابيزات صالون ورخام فاخر" },
+                  { id: 2, slug: "consoles", nameAr: "كونسول استيل", nameEn: "Steel Consoles", descriptionAr: "كونسول مداخل وتحف استيل" },
+                  { id: 3, slug: "mirrors", nameAr: "مرايات مضيئة", nameEn: "LED Mirrors", descriptionAr: "مرايات استيل ليد ذكية" },
+                  { id: 4, slug: "partitions", nameAr: "قواطع جدارية", nameEn: "Wall Partitions", descriptionAr: "قواطع وبرافانات استيل مودرن" },
+                ]
+            ).map((cat: any) => (
+              <Link key={cat.id} href={`/products?category=${cat.slug}`} className="group">
                 <div className="rounded-3xl border border-[#e8e2d8] bg-white p-6 transition-all duration-300 hover:-translate-y-1.5 hover:shadow-xl hover:border-[#d5af58] space-y-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#d5af58]/15 text-[#a8822d] group-hover:bg-[#24211d] group-hover:text-[#d5af58] transition-colors">
                     <Layers className="h-6 w-6" />
@@ -197,7 +210,7 @@ export default function Home() {
               </h2>
             </div>
             <Link href="/products">
-              <Button className="bg-[#24211d] text-white hover:bg-[#a8822d] font-bold rounded-xl">
+              <Button className="bg-[#24211d] text-white hover:bg-[#a8822d] font-bold rounded-xl cursor-pointer">
                 {t("تصفح جميع المنتجات", "Browse All")}
               </Button>
             </Link>
@@ -214,7 +227,7 @@ export default function Home() {
                   key={p.id}
                   product={p}
                   categoryName={
-                    categories?.find((c) => c.slug === p.category)?.[
+                    categories.find((c: any) => c.slug === p.category)?.[
                       lang === "ar" ? "nameAr" : "nameEn"
                     ]
                   }
@@ -244,23 +257,26 @@ export default function Home() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {(galleryItems?.slice(0, 3) || [
-            {
-              id: 1,
-              title: "ترابيزة صالون استيل 304 ذهبي",
-              imageUrl: "https://images.unsplash.com/photo-1533090161767-e6ffed986b88?w=800&auto=format&fit=crop&q=80",
-            },
-            {
-              id: 2,
-              title: "كونسول مدخل استيل مودرن مع رخام",
-              imageUrl: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?w=800&auto=format&fit=crop&q=80",
-            },
-            {
-              id: 3,
-              title: "قاطع جداري بارتشن استيل ذهبي مطفي",
-              imageUrl: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&auto=format&fit=crop&q=80",
-            },
-          ]).map((item: any) => (
+          {(galleryItems.length > 0
+            ? galleryItems.slice(0, 3)
+            : [
+                {
+                  id: 1,
+                  title: "ترابيزة صالون استيل 304 ذهبي",
+                  imageUrl: "https://images.unsplash.com/photo-1533090161767-e6ffed986b88?w=800&auto=format&fit=crop&q=80",
+                },
+                {
+                  id: 2,
+                  title: "كونسول مدخل استيل مودرن مع رخام",
+                  imageUrl: "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?w=800&auto=format&fit=crop&q=80",
+                },
+                {
+                  id: 3,
+                  title: "قاطع جداري بارتشن استيل ذهبي مطفي",
+                  imageUrl: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800&auto=format&fit=crop&q=80",
+                },
+              ]
+          ).map((item: any) => (
             <div key={item.id} className="group relative overflow-hidden rounded-3xl border border-[#e8e2d8] aspect-4/3 shadow-xs hover:shadow-xl transition-all">
               <img src={item.imageUrl} alt={item.title} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-6 text-white opacity-90">
@@ -275,7 +291,7 @@ export default function Home() {
 
         <div className="mt-10 text-center">
           <Link href="/work">
-            <Button size="lg" variant="outline" className="font-bold border-[#d5af58] text-[#a8822d] px-8 rounded-xl">
+            <Button size="lg" variant="outline" className="font-bold border-[#d5af58] text-[#a8822d] px-8 rounded-xl cursor-pointer">
               {t("استكشف معرض الأعمال بالكامل", "View Full Gallery")}
             </Button>
           </Link>
@@ -306,14 +322,14 @@ export default function Home() {
               target="_blank"
               rel="noreferrer"
             >
-              <Button size="lg" className="bg-[#24211d] text-white hover:bg-[#3d372e] font-black px-8 h-14 rounded-2xl text-base shadow-lg">
+              <Button size="lg" className="bg-[#24211d] text-white hover:bg-[#3d372e] font-black px-8 h-14 rounded-2xl text-base shadow-lg cursor-pointer">
                 <MessageCircle className="ml-2 h-5 w-5 text-emerald-400" />
                 {t("تواصل عبر واتساب", "WhatsApp Chat")}
               </Button>
             </a>
 
             <a href={`tel:+20${BUSINESS_PHONE.slice(1)}`}>
-              <Button size="lg" variant="outline" className="border-[#24211d] text-[#24211d] hover:bg-[#24211d]/10 font-bold px-6 h-14 rounded-2xl">
+              <Button size="lg" variant="outline" className="border-[#24211d] text-[#24211d] hover:bg-[#24211d]/10 font-bold px-6 h-14 rounded-2xl cursor-pointer">
                 <Phone className="ml-2 h-5 w-5" />
                 {BUSINESS_PHONE}
               </Button>

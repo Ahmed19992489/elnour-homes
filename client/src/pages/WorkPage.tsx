@@ -16,10 +16,9 @@ export default function WorkPage() {
     description: "استعرض سابقة أعمال ومشاريع Elnour Homes المنفذة من ديكورات الاستيل الفاخرة وتشطيبات الفلل والمنازل العصرية.",
   });
 
-  const { data: galleryItems, isLoading } = trpc.gallery.list.useQuery();
+  const { data: rawGallery, isLoading } = trpc.gallery.list.useQuery();
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
-  // Fallback demo items if database gallery is empty
   const defaultItems = [
     {
       id: 1,
@@ -59,7 +58,8 @@ export default function WorkPage() {
     },
   ];
 
-  const items = galleryItems && galleryItems.length > 0 ? galleryItems : defaultItems;
+  const galleryItems = Array.isArray(rawGallery) ? rawGallery : [];
+  const items = galleryItems.length > 0 ? galleryItems : defaultItems;
 
   return (
     <PublicLayout>
@@ -100,28 +100,26 @@ export default function WorkPage() {
                   alt={item.title}
                   className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                 />
-
-                {/* Overlay */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-6 text-white">
-                  <span className="text-xs font-bold text-[#d5af58] mb-1">{item.category}</span>
+                  <span className="text-xs font-bold text-[#d5af58]">{item.category}</span>
                   <h3 className="text-lg font-bold">{item.title}</h3>
-                  <div className="mt-4 flex gap-2">
+                  <div className="mt-3 flex items-center gap-2">
                     <Button
                       size="sm"
                       onClick={() => setSelectedImage(item.imageUrl)}
-                      className="bg-white/20 hover:bg-white/30 text-white backdrop-blur rounded-xl text-xs font-bold"
+                      className="bg-white/20 hover:bg-white/30 backdrop-blur-md text-white text-xs h-8 rounded-lg cursor-pointer"
                     >
-                      <Eye className="ml-1 h-3.5 w-3.5" />
-                      تكبير الصورة
+                      <Eye className="h-3.5 w-3.5 ml-1" />
+                      {t("تكبير الصورة", "View Full")}
                     </Button>
                     <a
-                      href={`https://wa.me/20${BUSINESS_PHONE.slice(1)}?text=${encodeURIComponent(`مرحباً Elnour Homes، أود الاستفسار عن تنفيذ مثل هذا التصميم: ${item.title}`)}`}
+                      href={`https://wa.me/20${BUSINESS_PHONE.slice(1)}?text=${encodeURIComponent(`مرحباً، أود الاستفسار عن تفصيل عمل مماثل لـ: ${item.title}`)}`}
                       target="_blank"
                       rel="noreferrer"
                     >
-                      <Button size="sm" className="bg-[#d5af58] text-[#24211d] hover:bg-[#e0be6c] font-bold rounded-xl text-xs">
-                        <MessageCircle className="ml-1 h-3.5 w-3.5" />
-                        طلب مثل هذا
+                      <Button size="sm" className="bg-[#d5af58] text-[#24211d] hover:bg-[#e0be6c] text-xs h-8 font-bold rounded-lg cursor-pointer">
+                        <MessageCircle className="h-3.5 w-3.5 ml-1 text-emerald-700" />
+                        {t("اطلب مثله", "Order Similar")}
                       </Button>
                     </a>
                   </div>
@@ -132,18 +130,16 @@ export default function WorkPage() {
         )}
       </section>
 
-      {/* Lightbox Dialog */}
-      <Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
-        <DialogContent className="max-w-4xl p-0 bg-transparent border-0 overflow-hidden shadow-2xl">
-          {selectedImage && (
-            <img
-              src={selectedImage}
-              alt="Project View"
-              className="w-full max-h-[85vh] object-contain rounded-2xl"
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* Image Preview Modal */}
+      {selectedImage && (
+        <Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
+          <DialogContent className="max-w-4xl p-2 bg-black/90 border-neutral-800">
+            <div className="relative rounded-lg overflow-hidden flex items-center justify-center">
+              <img src={selectedImage} alt="Preview" className="max-h-[85vh] w-auto object-contain rounded" />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </PublicLayout>
   );
 }
