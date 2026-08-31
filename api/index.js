@@ -564,7 +564,7 @@ async function upsertUser(user) {
   try {
     const values = { openId: user.openId };
     const updateSet = {};
-    const textFields = ["name", "email", "loginMethod"];
+    const textFields = ["name", "email", "phone", "address", "loginMethod", "referralCode"];
     for (const field of textFields) {
       const value = user[field];
       if (value === void 0) continue;
@@ -1499,8 +1499,9 @@ var appRouter = router({
         openId,
         id: existingUser?.id ?? 0,
         name: existingUser?.name ?? input.name,
-        phone: normalizedPhone,
-        email: existingUser?.email,
+        phone: existingUser?.phone ?? normalizedPhone,
+        email: existingUser?.email ?? (input.email?.trim() || null),
+        address: existingUser?.address ?? (input.address?.trim() || null),
         role: existingUser?.role || "user"
       }).setProtectedHeader({ alg: "HS256" }).setIssuedAt().setExpirationTime("30d").sign(secretKey);
       const cookieOptions = getSessionCookieOptions(ctx.req);

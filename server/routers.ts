@@ -138,8 +138,9 @@ export const appRouter = router({
           openId,
           id: existingUser?.id ?? 0,
           name: existingUser?.name ?? input.name,
-          phone: normalizedPhone,
-          email: existingUser?.email,
+          phone: existingUser?.phone ?? normalizedPhone,
+          email: existingUser?.email ?? (input.email?.trim() || null),
+          address: existingUser?.address ?? (input.address?.trim() || null),
           role: existingUser?.role || "user",
         })
           .setProtectedHeader({ alg: "HS256" })
