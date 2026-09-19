@@ -22,8 +22,8 @@ export default function WishlistPage() {
   const shown = (products ?? []).filter((p) => ids.includes(p.id));
 
   UpdateHead({
-    title: lang === "ar" ? "قائمة المفضلة | Elnour for STEEL" : "Wishlist | Elnour for STEEL",
-    description: lang === "ar" ? "منتجاتك المفضلة في Elnour for STEEL." : "Your saved favourites at Elnour for STEEL.",
+    title: lang === "ar" ? "قائمة المفضلة | Elnour Home - النور هوم" : "Wishlist | Elnour Home",
+    description: lang === "ar" ? "منتجاتك المفضلة في Elnour Home." : "Your saved favourites at Elnour Home.",
     path: "/wishlist",
   });
 

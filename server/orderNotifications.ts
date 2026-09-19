@@ -80,7 +80,7 @@ export async function notifyOrderCustomer(order: Order, event: NotificationEvent
     return { delivered: false, reason: !recipient ? "no_recipient" : "email_not_configured" } as const;
   }
 
-  const origin = process.env.CANONICAL_ORIGIN || "https://elnoursteel-eexiztdb.manus.space";
+  const origin = process.env.CANONICAL_ORIGIN || "https://elnourhomes.com";
   const orderUrl = `${origin}/account/orders/${order.id}`;
   const safeName = escapeHtml(order.customerName || "عميلنا العزيز");
   const safeProduct = escapeHtml(order.productName || "طلبك");
@@ -95,7 +95,7 @@ export async function notifyOrderCustomer(order: Order, event: NotificationEvent
         <p style="margin:0"><strong>الحالة الحالية:</strong> ${escapeHtml(copy.statusLabel)}</p>
       </section>
       <a href="${orderUrl}" style="display:inline-block;background:#9f711b;color:#fff;text-decoration:none;padding:12px 18px;border-radius:8px">عرض تفاصيل الطلب</a>
-      <p style="color:#68625a;font-size:12px;margin-top:28px">Elnour for STEEL</p>
+      <p style="color:#68625a;font-size:12px;margin-top:28px">Elnour Home</p>
     </main>`;
 
   try {

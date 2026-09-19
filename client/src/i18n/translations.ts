@@ -60,7 +60,7 @@ export const translations = {
 
     // About
     aboutTitle: "من نحن",
-    aboutText1: "Elnour for STEEL هي علامة متخصصة في أعمال الديكور المنزلي المصنوعة من الاستيل عالي الجودة، المطلي بدهانات إلكتروستاتيك التي تضمن متانة ولوناً ثابتاً يدوم لسنوات طويلة.",
+    aboutText1: "النور هوم (Elnour Home) هي علامة متخصصة في أعمال الديكور والأثاث المنزلي المصنوع من الاستيل عالي الجودة، المطلي بدهانات إلكتروستاتيك التي تضمن متانة ولوناً ثابتاً يدوم لسنوات طويلة.",
     aboutText2: "نحرص على تقديم أعمال فنية فاخرة تجمع بين الحرفة والذوق الرفيع، من طالبون وطرابيز وأعمال ديكور حائطية تناسب كل بيت.",
 
     // Contact
@@ -198,7 +198,7 @@ export const translations = {
 
     // About
     aboutTitle: "About Us",
-    aboutText1: "Elnour for STEEL specializes in luxury home décor pieces made from high-quality steel, coated with electrostatic paints that ensure durability and a lasting finish for years to come.",
+    aboutText1: "Elnour Home specializes in luxury home décor and modern steel furniture pieces made from high-quality steel, coated with electrostatic paints that ensure durability and a lasting finish for years to come.",
     aboutText2: "We pride ourselves on delivering artistic works that combine craftsmanship with refined taste — from wall art and tables to bespoke décor pieces for every home.",
 
     // Contact

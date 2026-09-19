@@ -18,8 +18,8 @@ export default function CategoryPage() {
   const loading = categoriesLoading || productsLoading;
 
   UpdateHead({
-    title: title ? `${title} | Elnour for STEEL` : (lang === "ar" ? "فئة المنتجات | Elnour for STEEL" : "Product Category | Elnour for STEEL"),
-    description: description || (lang === "ar" ? "تصفح منتجات الفئة من ديكورات وفواصل وطرابيزات الاستيل" : "Browse products in this category: steel decor, dividers and tables"),
+    title: title ? `${title} | Elnour Home - النور هوم` : (lang === "ar" ? "فئة المنتجات | Elnour Home" : "Product Category | Elnour Home"),
+    description: description || (lang === "ar" ? "تصفح منتجات الفئة من ديكورات وفواصل وطرابيزات وأثاث استيل" : "Browse products in this category: luxury furniture, steel decor, dividers and tables"),
     path: `/products/${slug}`,
   });
 

@@ -17,7 +17,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 
-const BUSINESS_PHONE = "01121748885";
+const BUSINESS_PHONE = "01118182424";
 
 export default function Navbar() {
   const [location] = useLocation();
@@ -52,7 +52,7 @@ export default function Navbar() {
         <div className="container mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="inline-block h-2 w-2 rounded-full bg-[#d5af58] animate-pulse" />
-            <span>{t("تصنيع وتفصيل أرقى ديكورات الاستيل حسب المقاس والطلب", "Custom luxury steel fabrication per your custom dimensions")}</span>
+            <span>{t("تصنيع وتفصيل أرقى أثاث وديكورات الاستيل حسب المقاس والطلب", "Custom luxury furniture & steel fabrication per your custom dimensions")}</span>
           </div>
           <div className="flex items-center gap-4">
             <a
@@ -77,15 +77,17 @@ export default function Navbar() {
       <div className="container mx-auto flex h-20 items-center justify-between px-4">
         {/* Brand Logo */}
         <Link href="/" className="flex items-center gap-3 group">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#24211d] text-[#d5af58] shadow-md group-hover:scale-105 transition-transform">
-            <Sparkles className="h-6 w-6" />
-          </div>
+          <img
+            src="/logo.png"
+            alt="Elnour Home"
+            className="h-12 w-12 rounded-xl object-contain shadow-md group-hover:scale-105 transition-transform"
+          />
           <div className="flex flex-col">
             <span className="text-2xl font-black tracking-tight text-[#24211d]">
-              ELNOUR <span className="text-[#a8822d]">HOMES</span>
+              ELNOUR <span className="text-[#a8822d]">HOME</span>
             </span>
             <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#786f63]">
-              STEEL & LUXURY DECOR
+              {lang === "ar" ? "أثاث وديكور وحلول معدنية" : "LUXURY FURNITURE & DECOR"}
             </span>
           </div>
         </Link>

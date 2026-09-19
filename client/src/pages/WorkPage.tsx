@@ -7,8 +7,8 @@ import { Images, Loader2 } from "lucide-react";
 export default function WorkPage() {
   const { lang } = useLanguage();
   UpdateHead({
-    title: lang === "ar" ? "أعمالنا | Elnour for STEEL - ديكورات استيل" : "Our Work | Elnour for STEEL - Steel Decor",
-    description: lang === "ar" ? "نماذج من أعمال Elnour for STEEL المنفذة: ديكورات استيل مطلى بفواصل وطرابيزات ومسابح إضاءة." : "Examples of completed Elnour for STEEL work: electrostatic-coated steel décor, dividers, tables and light channels.",
+    title: lang === "ar" ? "أعمالنا ومعرض الصور | Elnour Home - النور هوم" : "Our Work | Elnour Home - Luxury Furniture & Steel Decor",
+    description: lang === "ar" ? "نماذج من أعمال Elnour Home المنفذة: ديكورات استيل، طرابيزات، فواصل ومرايات بأعلى جودة تشطيب." : "Examples of completed Elnour Home work: luxury steel décor, dividers, tables and custom furniture.",
     path: lang === "ar" ? "/work?lang=ar" : "/work?lang=en",
   });
   const { data: gallery, isLoading } = trpc.gallery.list.useQuery();

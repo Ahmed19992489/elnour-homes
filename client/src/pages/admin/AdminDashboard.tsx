@@ -34,7 +34,7 @@ export default function AdminDashboard() {
       <div className="flex min-h-screen flex-col items-center justify-center p-8 text-center">
         <h1 className="text-xl font-bold">هذه الصفحة للإدارة فقط</h1>
         <p className="mt-2 max-w-md text-muted-foreground">
-          يبدو أنك عميل لدى Elnour for STEEL — يمكنك متابعة طلباتك وتحديث بياناتك من صفحة حسابك.
+          يبدو أنك عميل لدى Elnour Home (النور هوم) — يمكنك متابعة طلباتك وتحديث بياناتك من صفحة حسابك.
         </p>
         <Button className="mt-6 bg-[#26231e] text-white hover:bg-[#ad842f]" onClick={() => window.location.assign("/account")}>
           فتح حسابي

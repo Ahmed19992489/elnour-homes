@@ -131,7 +131,7 @@ export default function AdminOrders() {
         couponCode: order.couponCode,
         status: statusLabels[order.status] ?? order.status,
         lang: "ar",
-        contactPhone: contact?.phone || "01121748885",
+        contactPhone: contact?.phone || "01118182424",
       });
 
       const url = URL.createObjectURL(blob);

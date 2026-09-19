@@ -12,8 +12,8 @@ type ContentPageProps = {
 const fallbackContent = {
   about: {
     titleAr: "من نحن", titleEn: "About Us", subtitleAr: "استيل بتفاصيل تصنع الفرق", subtitleEn: "Steel crafted for meaningful spaces",
-    contentAr: "في Elnour for STEEL نصمم وننفذ ديكورات وأثاث الاستيل بلمسة تجمع بين المتانة والذوق. نهتم بالتشطيب، تناسب المقاسات، والتفاصيل التي تجعل كل قطعة مناسبة لمساحتك.\n\nتصفح المنتجات أو تواصل معنا على واتساب لمناقشة أي مقاس أو تصميم خاص.",
-    contentEn: "At Elnour for STEEL, we design and craft steel décor and furniture that balances durability with refined style. We care about finishes, proportions, and the details that make every piece belong in your space.\n\nBrowse the catalogue or contact us on WhatsApp to discuss a custom size or design.",
+    contentAr: "في Elnour Home نصمم وننفذ ديكورات وأثاث الاستيل بلمسة تجمع بين المتانة والذوق. نهتم بالتشطيب، تناسب المقاسات، والتفاصيل التي تجعل كل قطعة مناسبة لمساحتك.\n\nتصفح المنتجات أو تواصل معنا على واتساب لمناقشة أي مقاس أو تصميم خاص.",
+    contentEn: "At Elnour Home, we design and craft steel décor and furniture that balances durability with refined style. We care about finishes, proportions, and the details that make every piece belong in your space.\n\nBrowse the catalogue or contact us on WhatsApp to discuss a custom size or design.",
   },
   story: {
     titleAr: "قصتنا", titleEn: "Our Story", subtitleAr: "خبرة تتطور مع كل مشروع", subtitleEn: "Experience refined with every project",
@@ -26,19 +26,19 @@ export default function ContentPage({ sectionKey }: ContentPageProps) {
   const { lang, isRTL } = useLanguage();
 
   UpdateHead({
-    title: lang === "ar" ? (sectionKey === "about" ? "من نحن | Elnour for STEEL" : "قصتنا | Elnour for STEEL") : (sectionKey === "about" ? "About Us | Elnour for STEEL" : "Our Story | Elnour for STEEL"),
-    description: lang === "ar" ? "تعرف على Elnour for STEEL وقصة خبرتنا في تصميم وتنفيذ ديكورات الاستيل المطلى بدهانات الكتروستاتيك" : "Learn about Elnour for STEEL and our experience designing and crafting electrostatic-coated steel home décor",
+    title: lang === "ar" ? (sectionKey === "about" ? "من نحن | Elnour Home" : "قصتنا | Elnour Home") : (sectionKey === "about" ? "About Us | Elnour Home" : "Our Story | Elnour Home"),
+    description: lang === "ar" ? "تعرف على Elnour Home وقصة خبرتنا في تصميم وتنفيذ ديكورات وأثاث الاستيل المنزلي الفاخر" : "Learn about Elnour Home and our experience designing and crafting luxury steel home décor and furniture",
     path: `/${sectionKey}`,
     jsonLd: {
       "@context": "https://schema.org",
       "@type": "AboutPage",
       "mainEntity": {
         "@type": "HomeGoodsStore",
-        "name": "Elnour for STEEL",
-        "description": lang === "ar" ? "أعمال ديكور منزلية فاخرة من الاستيل المطلى بدهانات الكتروستاتيك" : "Luxury home décor crafted from electrostatic-coated steel",
-        "url": "https://elnoursteel-eexiztdb.manus.space",
+        "name": "Elnour Home",
+        "description": lang === "ar" ? "أعمال ديكور منزلية فاخرة وأثاث عصري من الاستيل" : "Luxury home décor and modern steel furniture",
+        "url": "https://elnourhomes.com",
         "telephone": "+201118182424",
-        "sameAs": ["https://www.facebook.com/share/19KhMom9Sq/"],
+        "sameAs": ["https://www.facebook.com/Elnour.home"],
       },
     },
   });
@@ -52,7 +52,7 @@ export default function ContentPage({ sectionKey }: ContentPageProps) {
   return <PublicLayout>
     <section className="border-b border-[#ddd6c8] bg-[#24211d] px-4 py-16 text-[#f9f7f2] md:py-24">
       <div className="container max-w-4xl">
-        <p className="text-sm font-bold tracking-[0.2em] text-[#d5af58]">ELNOUR FOR STEEL</p>
+        <p className="text-sm font-bold tracking-[0.2em] text-[#d5af58]">ELNOUR HOME</p>
         <h1 className="mt-4 text-4xl font-black md:text-6xl">{title}</h1>
         <p className="mt-5 max-w-2xl text-lg leading-8 text-[#ded8ce]">{subtitle}</p>
       </div>

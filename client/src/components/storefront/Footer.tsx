@@ -1,9 +1,10 @@
 import React from "react";
 import { Link } from "wouter";
-import { Sparkles, Phone, Mail, MapPin, MessageCircle, ShieldCheck, Truck, Clock } from "lucide-react";
+import { Sparkles, Phone, Mail, MapPin, MessageCircle, ShieldCheck, Truck, Clock, Facebook } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 
-const BUSINESS_PHONE = "01121748885";
+const BUSINESS_PHONE = "01118182424";
+const SECONDARY_PHONE = "01114323218";
 const BUSINESS_EMAIL = "info@elnourhomes.com";
 
 export default function Footer() {
@@ -62,11 +63,13 @@ export default function Footer() {
           {/* Brand Info */}
           <div className="lg:col-span-2 space-y-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#d5af58] text-[#24211d]">
-                <Sparkles className="h-5 w-5" />
-              </div>
+              <img
+                src="/logo.png"
+                alt="Elnour Home"
+                className="h-10 w-10 rounded-xl object-contain shadow"
+              />
               <span className="text-2xl font-black tracking-tight text-white">
-                ELNOUR <span className="text-[#d5af58]">HOMES</span>
+                ELNOUR <span className="text-[#d5af58]">HOME</span>
               </span>
             </div>
             <p className="text-sm leading-relaxed text-[#b5aba0] max-w-sm">
@@ -84,6 +87,15 @@ export default function Footer() {
                 title="WhatsApp"
               >
                 <MessageCircle className="h-5 w-5" />
+              </a>
+              <a
+                href="https://www.facebook.com/Elnour.home"
+                target="_blank"
+                rel="noreferrer"
+                className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#2e2a23] text-[#d5af58] hover:bg-[#d5af58] hover:text-[#24211d] transition-all"
+                title="Facebook"
+              >
+                <Facebook className="h-5 w-5" />
               </a>
               <a
                 href={`tel:+20${BUSINESS_PHONE.slice(1)}`}
@@ -137,6 +149,9 @@ export default function Footer() {
                   <a href={`tel:+20${BUSINESS_PHONE.slice(1)}`} className="text-[#d5af58] font-bold dir-ltr block" dir="ltr">
                     +20 {BUSINESS_PHONE.slice(1, 4)} {BUSINESS_PHONE.slice(4, 7)} {BUSINESS_PHONE.slice(7)}
                   </a>
+                  <a href={`tel:+20${SECONDARY_PHONE.slice(1)}`} className="text-[#d5af58] font-bold dir-ltr block text-xs mt-1" dir="ltr">
+                    +20 {SECONDARY_PHONE.slice(1, 4)} {SECONDARY_PHONE.slice(4, 7)} {SECONDARY_PHONE.slice(7)}
+                  </a>
                 </div>
               </li>
               <li className="flex items-start gap-2.5">
@@ -160,8 +175,8 @@ export default function Footer() {
       {/* Copyright Bar */}
       <div className="border-t border-[#2d2923] py-6 text-center text-xs text-[#8c8273]">
         <div className="container mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p>© {new Date().getFullYear()} Elnour Homes for Steel & Decor. {t("جميع الحقوق محفوظة.", "All rights reserved.")}</p>
-          <p>{t("تصميم وتصنيع استيل بأعلى معايير الجودة العالمية", "Premium stainless steel decor & custom furniture")}</p>
+          <p>© {new Date().getFullYear()} Elnour Home. {t("جميع الحقوق محفوظة.", "All rights reserved.")}</p>
+          <p>{t("تصميم وتصنيع أثاث وديكورات استيل بأعلى معايير الجودة العالمية", "Premium stainless steel decor & custom furniture")}</p>
         </div>
       </div>
     </footer>

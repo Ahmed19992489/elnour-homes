@@ -412,7 +412,7 @@ export const appRouter = router({
           ].filter(Boolean).join("\n");
 
           await notifyOwner({
-            title: "طلب جديد - Elnour for STEEL",
+            title: "طلب جديد - Elnour Home",
             content: orderDetails,
           });
           notificationSent = true;
@@ -580,7 +580,7 @@ export const appRouter = router({
           ].filter(Boolean).join("\n");
 
           await notifyOwner({
-            title: "طلب سلة جديد - Elnour for STEEL",
+            title: "طلب سلة جديد - Elnour Home",
             content: orderDetails,
           });
           notificationSent = true;
@@ -1075,7 +1075,7 @@ export const appRouter = router({
         const expected =
           normalized === db.normalizePhone("01118182424")
             ? process.env.ADMIN_PHONE_1_PASSWORD
-            : normalized === db.normalizePhone("01121748885")
+            : normalized === db.normalizePhone("01114323218")
               ? process.env.ADMIN_PHONE_2_PASSWORD
               : undefined;
         if (!expected || expected !== input.password) {

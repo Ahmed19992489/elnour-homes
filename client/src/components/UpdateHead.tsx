@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-const BASE_URL = "https://elnoursteel-eexiztdb.manus.space";
+const BASE_URL = "https://elnourhomes.com";
 
 interface UpdateHeadProps {
   title: string;

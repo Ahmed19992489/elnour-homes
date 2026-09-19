@@ -3,7 +3,7 @@ export const ENV = {
   cookieSecret: process.env.JWT_SECRET || process.env.COOKIE_SECRET || "elnour-steel-secret-key-jwt-2026-production",
   databaseUrl: process.env.DATABASE_URL ?? "",
   oAuthServerUrl: process.env.OAUTH_SERVER_URL ?? "",
-  ownerOpenId: process.env.OWNER_OPEN_ID || "admin-01121748885",
+  ownerOpenId: process.env.OWNER_OPEN_ID || "admin-01118182424",
 
   isProduction: process.env.NODE_ENV === "production",
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",

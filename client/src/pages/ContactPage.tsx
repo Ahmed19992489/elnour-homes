@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
 const DEFAULT_BUSINESS_WHATSAPP = "01118182424";
-const DEFAULT_FACEBOOK = "https://www.facebook.com/share/19KhMom9Sq/";
+const DEFAULT_FACEBOOK = "https://www.facebook.com/Elnour.home";
 
 function waNumber(n: string): string {
   const digits = n.replace(/\D/g, "");
@@ -20,11 +20,11 @@ function waNumber(n: string): string {
 export default function ContactPage() {
   const { lang } = useLanguage();
   UpdateHead({
-    title: lang === "ar" ? "اتصل بنا | Elnour for STEEL" : "Contact Us | Elnour for STEEL",
+    title: lang === "ar" ? "اتصل بنا | Elnour Home - النور هوم" : "Contact Us | Elnour Home",
     description:
       lang === "ar"
-        ? "تواصل مع Elnour for STEEL عبر واتساب الأعمال أو الهاتف أو نموذج الرسائل. نرد على استفساراتك عن ديكورات الاستيل والأسعار والتصاميم المخصصة."
-        : "Contact Elnour for STEEL via Business WhatsApp, phone, or message form. We reply to your inquiries about steel decor, pricing, and custom designs.",
+        ? "تواصل مع Elnour Home (النور هوم) عبر واتساب الأعمال أو الهاتف أو نموذج الرسائل. نرد على استفساراتك عن الأثاث وديكورات الاستيل والأسعار والتصاميم المخصصة."
+        : "Contact Elnour Home via Business WhatsApp, phone, or message form. We reply to your inquiries about luxury furniture, steel decor, pricing, and custom designs.",
     path: "/contact",
   });
   const [form, setForm] = useState({ name: "", phone: "", email: "", subject: "", message: "" });
@@ -37,7 +37,7 @@ export default function ContactPage() {
   });
 
   const waLink = `https://wa.me/${waNumber(DEFAULT_BUSINESS_WHATSAPP)}`;
-  const phoneDisplay = "+20 111 818 2424";
+  const phoneDisplay = "+20 111 818 2424 / +20 111 432 3218";
 
   const blocks = [
     {
@@ -64,8 +64,8 @@ export default function ContactPage() {
       icon: MapPin,
       titleAr: "صفحة فيسبوك",
       titleEn: "Facebook Page",
-      valueAr: "تابع أعمالنا الجديدة والعروض على فيسبوك",
-      valueEn: "Follow our latest work and offers on Facebook",
+      valueAr: "تابع أعمالنا الجديدة والعروض على صفحتنا الرسمية",
+      valueEn: "Follow our latest work and offers on our official page",
       href: DEFAULT_FACEBOOK,
       external: true,
       ctaAr: "افتح الصفحة",
@@ -87,7 +87,7 @@ export default function ContactPage() {
     <PublicLayout>
       <section className="border-b border-[#ddd6c8] bg-[#24211d] px-4 py-16 text-[#f9f7f2] md:py-24">
         <div className="container max-w-4xl">
-          <p className="text-sm font-bold tracking-[0.2em] text-[#d5af58]">ELNOUR FOR STEEL</p>
+          <p className="text-sm font-bold tracking-[0.2em] text-[#d5af58]">ELNOUR HOME</p>
           <h1 className="mt-4 text-4xl font-black md:text-6xl">
             {lang === "ar" ? "اتصل بنا" : "Contact Us"}
           </h1>

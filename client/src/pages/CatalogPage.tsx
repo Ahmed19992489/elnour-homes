@@ -17,8 +17,8 @@ import { Link, useLocation } from "wouter";
 export default function CatalogPage() {
   const { lang } = useLanguage();
   UpdateHead({
-    title: lang === "ar" ? "كتالوج المنتجات | Elnour for STEEL - ديكورات استيل" : "Product Catalog | Elnour for STEEL - Steel Decor",
-    description: lang === "ar" ? "تصفح كتالوج منتجات Elnour for STEEL: طرابيزات، فواصل، مسابح إضاءة وديكور حوائط من الاستيل المطلى بدهانات الكتروستاتيك." : "Browse the Elnour for STEEL catalog: tables, dividers, light channels and wall decor crafted from electrostatic-coated steel.",
+    title: lang === "ar" ? "كتالوج المنتجات | Elnour Home - أثاث وديكورات استيل" : "Product Catalog | Elnour Home - Luxury Furniture & Steel Decor",
+    description: lang === "ar" ? "تصفح كتالوج منتجات Elnour Home: طرابيزات، كونسول، فواصل، مسابح إضاءة وديكور حوائط من الاستيل الفاخر." : "Browse the Elnour Home catalog: tables, consoles, dividers, light channels and luxury steel decor.",
     path: lang === "ar" ? "/catalog?lang=ar" : "/catalog?lang=en",
   });
   const { data: categories } = trpc.categories.active.useQuery();

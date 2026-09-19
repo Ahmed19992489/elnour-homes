@@ -100,11 +100,11 @@ export function buildOrderInvoiceMarkup(invoice: OrderInvoicePdfData) {
       .invoice-row { display: flex; align-items: baseline; justify-content: space-between; gap: 28px; min-height: 47px; padding: 11px 18px; border-bottom: 1px solid #eee7d9; }.invoice-row:last-child { border-bottom: 0; }.invoice-row:nth-child(even) { background: #faf7ef; }.invoice-row__label { color: #655d4f; font-weight: 600; }.invoice-row__value { max-width: 64%; color: #29261f; font-weight: 600; overflow-wrap: anywhere; }
       .invoice-row--amount .invoice-row__value { direction: ltr; font-family: Arial, sans-serif; font-size: 16px; }.invoice-row--total { min-height: 58px; color: #fffaf0; background: #8e6924 !important; }.invoice-row--total .invoice-row__label, .invoice-row--total .invoice-row__value { color: #fffaf0; font-size: 20px; }.invoice-row--total .invoice-row__value { direction: ltr; font-family: Arial, sans-serif; }.invoice-footer { margin-top: 34px; padding-top: 16px; color: #655d4f; border-top: 1px solid #d6c49c; font-size: 15px; }.invoice-footer strong { color: #8e6924; }
     </style>
-    <header class="invoice-header"><div class="invoice-brand">Elnour for STEEL<small>${escapeHtml(label("فاتورة طلب", "Order invoice"))}</small></div><div class="invoice-meta"><div class="invoice-meta__number">${escapeHtml(label("طلب", "Order"))} #${escapeHtml(invoice.orderId)}</div><div>${escapeHtml(label("الحالة", "Status"))}: ${escapeHtml(invoice.status)}</div></div></header>
+    <header class="invoice-header"><div class="invoice-brand">Elnour Home<small>${escapeHtml(label("فاتورة طلب", "Order invoice"))}</small></div><div class="invoice-meta"><div class="invoice-meta__number">${escapeHtml(label("طلب", "Order"))} #${escapeHtml(invoice.orderId)}</div><div>${escapeHtml(label("الحالة", "Status"))}: ${escapeHtml(invoice.status)}</div></div></header>
     ${section(label("بيانات العميل والتوصيل", "Customer and delivery details"), customerRows)}
     ${section(label("تفاصيل المنتج", "Product details"), productRows)}
     ${section(label("ملخص المبلغ", "Order total"), totalRows)}
-    <footer class="invoice-footer"><strong>${escapeHtml(label("للاستفسار", "For support"))}:</strong> ${escapeHtml(invoice.contactPhone || "Elnour for STEEL")}</footer>
+    <footer class="invoice-footer"><strong>${escapeHtml(label("للاستفسار", "For support"))}:</strong> ${escapeHtml(invoice.contactPhone || "Elnour Home")}</footer>
   </article>`;
 }
 

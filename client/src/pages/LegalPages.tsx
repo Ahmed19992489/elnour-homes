@@ -13,8 +13,8 @@ const content: Record<Legal, {
   privacy: {
     titleAr: "سياسة الخصوصية",
     titleEn: "Privacy Policy",
-    introAr: "خصوصيتك أولوية لدينا. توضح هذه السياسة كيف نتعامل مع بياناتك الشخصية عند استخدامك لموقع Elnour for STEEL.",
-    introEn: "Your privacy matters to us. This policy explains how we handle your personal data when you use the Elnour for STEEL website.",
+    introAr: "خصوصيتك أولوية لدينا. توضح هذه السياسة كيف نتعامل مع بياناتك الشخصية عند استخدامك لموقع Elnour Home (النور هوم).",
+    introEn: "Your privacy matters to us. This policy explains how we handle your personal data when you use the Elnour Home website.",
     blocks: [
       {
         hAr: "البيانات التي نجمعها",
@@ -47,8 +47,8 @@ const content: Record<Legal, {
   terms: {
     titleAr: "الشروط والأحكام",
     titleEn: "Terms & Conditions",
-    introAr: "باستخدامك لموقع Elnour for STEEL، فإنك توافق على الشروط التالية الخاصة بالطلبات والشراء من موقعنا.",
-    introEn: "By using the Elnour for STEEL website, you agree to the following terms governing orders and purchases from our site.",
+    introAr: "باستخدامك لموقع Elnour Home (النور هوم)، فإنك توافق على الشروط التالية الخاصة بالطلبات والشراء من موقعنا.",
+    introEn: "By using the Elnour Home website, you agree to the following terms governing orders and purchases from our site.",
     blocks: [
       {
         hAr: "الطلبات والتأكيد",
@@ -124,8 +124,8 @@ export default function LegalPage({ page }: { page: Legal }) {
   const { lang } = useLanguage();
   const c = content[page];
   UpdateHead({
-    title: lang === "ar" ? `${c.titleAr} | Elnour for STEEL` : `${c.titleEn} | Elnour for STEEL`,
-    description: lang === "ar" ? `${c.titleAr} لموقع Elnour for STEEL — أعمال ديكور منزلية من الاستيل المطلى بدهانات الكتروستاتيك` : `${c.titleEn} for Elnour for STEEL — electrostatic-coated steel home décor`,
+    title: lang === "ar" ? `${c.titleAr} | Elnour Home - النور هوم` : `${c.titleEn} | Elnour Home`,
+    description: lang === "ar" ? `${c.titleAr} لموقع Elnour Home — أعمال ديكور منزلية وأثاث من الاستيل المطلى بدهانات الكتروستاتيك` : `${c.titleEn} for Elnour Home — luxury furniture and steel home décor`,
     path: `/${page}`,
   });
 
@@ -133,7 +133,7 @@ export default function LegalPage({ page }: { page: Legal }) {
     <PublicLayout>
       <section className="border-b border-[#ddd6c8] bg-[#24211d] px-4 py-16 text-[#f9f7f2] md:py-24">
         <div className="container max-w-4xl">
-          <p className="text-sm font-bold tracking-[0.2em] text-[#d5af58]">ELNOUR FOR STEEL</p>
+          <p className="text-sm font-bold tracking-[0.2em] text-[#d5af58]">ELNOUR HOME</p>
           <h1 className="mt-4 text-4xl font-black md:text-6xl">{lang === "ar" ? c.titleAr : c.titleEn}</h1>
           <p className="mt-5 max-w-2xl text-lg leading-8 text-[#ded8ce]">{lang === "ar" ? c.introAr : c.introEn}</p>
         </div>

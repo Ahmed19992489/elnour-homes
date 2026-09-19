@@ -14,8 +14,8 @@ import { Link, useLocation } from "wouter";
 import CustomerAuthDialog from "./CustomerAuthDialog";
 
 const DEFAULT_WHATSAPP = "01118182424";
-const DEFAULT_WHATSAPP_MESSAGE = "مرحباً، أرغب في الاستفسار عن أعمال Elnour for STEEL";
-const DEFAULT_FACEBOOK = "https://www.facebook.com/share/19KhMom9Sq/";
+const DEFAULT_WHATSAPP_MESSAGE = "مرحباً، أرغب في الاستفسار عن أعمال Elnour Home";
+const DEFAULT_FACEBOOK = "https://www.facebook.com/Elnour.home";
 
 function buildWhatsAppLink(number: string, message: string) {
   return buildBusinessWhatsAppUrl(number, message || DEFAULT_WHATSAPP_MESSAGE);
@@ -242,10 +242,10 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
 
       <div className="fixed bottom-5 right-5 z-30 flex flex-col gap-3" dir="ltr">
         <a
-          href="https://www.facebook.com/NOOURSTEEL"
+          href="https://www.facebook.com/Elnour.home"
           target="_blank"
           rel="noreferrer"
-          title={lang === "ar" ? "راسلنا على ماسنجر / فيسبوك" : "Message us on Messenger / Facebook"}
+          title={lang === "ar" ? "راسلنا على فيسبوك / ماسنجر" : "Message us on Facebook / Messenger"}
           className="flex h-12 w-12 items-center justify-center rounded-full bg-[#0084ff] text-white shadow-xl transition-transform hover:scale-105"
           aria-label={lang === "ar" ? "راسلنا على ماسنجر" : "Message us on Messenger"}
         >
@@ -266,8 +266,13 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
       <footer className="mt-16 bg-[#24211d] text-[#f8f7f4]">
         <div className="container grid gap-8 py-12 md:grid-cols-[1.4fr_1fr_1fr]">
           <div>
-            <p className="text-xl font-black tracking-[0.16em]">ELNOUR</p>
-            <p className="mt-1 text-xs font-bold tracking-[0.32em] text-[#d5af58]">FOR STEEL</p>
+            <div className="flex items-center gap-3">
+              <img src="/logo.png" alt="Elnour Home" className="h-10 w-10 rounded-xl object-contain shadow" />
+              <div>
+                <p className="text-xl font-black tracking-[0.16em]">ELNOUR</p>
+                <p className="mt-0.5 text-xs font-bold tracking-[0.32em] text-[#d5af58]">HOME</p>
+              </div>
+            </div>
             <p className="mt-4 max-w-sm text-sm leading-7 text-[#d6d0c7]">{copy.footer}</p>
           </div>
           <div>
@@ -307,7 +312,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
             </div>
           </div>
         </div>
-        <div className="border-t border-white/10"><div className="container py-4 text-xs text-[#a9a196]">© {new Date().getFullYear()} Elnour for STEEL — {copy.rights}</div></div>
+        <div className="border-t border-white/10"><div className="container py-4 text-xs text-[#a9a196]">© {new Date().getFullYear()} Elnour Home — {copy.rights}</div></div>
       </footer>
     </div>
   );

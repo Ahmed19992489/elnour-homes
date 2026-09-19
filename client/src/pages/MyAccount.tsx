@@ -555,8 +555,8 @@ export default function MyAccount() {
                   className="gap-1 bg-[#25d366] text-white hover:bg-[#1fb855]"
                   onClick={() => {
                     const text = lang === "ar"
-                      ? `اشترِ من Elnour for STEEL باستخدام كود الإحالة الخاص بي: ${referral!.code}`
-                      : `Shop at Elnour for STEEL using my referral code: ${referral!.code}`;
+                      ? `اشترِ من النور هوم (Elnour Home) باستخدام كود الإحالة الخاص بي: ${referral!.code}`
+                      : `Shop at Elnour Home using my referral code: ${referral!.code}`;
                     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
                   }}
                 >

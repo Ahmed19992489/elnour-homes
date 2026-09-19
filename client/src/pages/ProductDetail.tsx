@@ -323,8 +323,8 @@ export default function ProductDetail() {
     "description": product.description || undefined,
     "sku": `ELN-${product.id}`,
     "category": product.category || undefined,
-    "image": images.map((image) => (image.startsWith("http") ? image : `https://elnoursteel-eexiztdb.manus.space${image}`)),
-    "brand": { "@type": "Brand", "name": "Elnour for STEEL" },
+    "image": images.map((image) => (image.startsWith("http") ? image : `https://elnourhomes.com${image}`)),
+    "brand": { "@type": "Brand", "name": "Elnour Home" },
     "additionalProperty": (specs ? Object.entries(specs)
       .filter(([, value]) => String(value).trim())
       .map(([key, value]) => ({ "@type": "PropertyValue", "name": key === "material" ? (lang === "ar" ? "المادة" : "Material") : key === "dimensions" ? (lang === "ar" ? "الأبعاد" : "Dimensions") : key === "finish" ? (lang === "ar" ? "التشطيب" : "Finish") : (lang === "ar" ? "العناية" : "Care"), "value": String(value) }))
@@ -334,7 +334,7 @@ export default function ProductDetail() {
       "price": Number(activeTotal || product.price),
       "priceCurrency": "EGP",
       "availability": "https://schema.org/InStock",
-      "seller": { "@type": "Organization", "name": "Elnour for STEEL" },
+      "seller": { "@type": "Organization", "name": "Elnour Home" },
     },
     ...(Number(avgRating) > 0 && Number(reviewCount) > 0
       ? {
@@ -351,15 +351,15 @@ export default function ProductDetail() {
     "breadcrumb": {
       "@type": "BreadcrumbList",
       "itemListElement": [
-        { "@type": "ListItem", "position": 1, "name": lang === "ar" ? "الرئيسية" : "Home", "item": "https://elnoursteel-eexiztdb.manus.space/" },
-        { "@type": "ListItem", "position": 2, "name": lang === "ar" ? "المنتجات" : "Products", "item": "https://elnoursteel-eexiztdb.manus.space/products" },
+        { "@type": "ListItem", "position": 1, "name": lang === "ar" ? "الرئيسية" : "Home", "item": "https://elnourhomes.com/" },
+        { "@type": "ListItem", "position": 2, "name": lang === "ar" ? "المنتجات" : "Products", "item": "https://elnourhomes.com/products" },
         { "@type": "ListItem", "position": 3, "name": product.nameAr },
       ],
     },
   } : null;
 
   UpdateHead({
-    title: product ? `${product.nameAr} | Elnour for STEEL` : (lang === "ar" ? "تفاصيل المنتج | Elnour for STEEL" : "Product | Elnour for STEEL"),
+    title: product ? `${product.nameAr} | Elnour Home` : (lang === "ar" ? "تفاصيل المنتج | Elnour Home" : "Product | Elnour Home"),
     description: product ? (product.description || "").slice(0, 155) : "",
     path: `/product/${id}`,
     jsonLd: productJsonLd,

@@ -38,8 +38,8 @@ export default function OffersPage() {
   const [copied, setCopied] = useState<string | null>(null);
 
   UpdateHead({
-    title: lang === "ar" ? "العروض والخصومات | Elnour for STEEL" : "Offers & Discounts | Elnour for STEEL",
-    description: lang === "ar" ? "اكشف أكواد الخصم النشطة من Elnour for STEEL — ديكورات استيل منزلية فاخرة." : "Discover active discount codes from Elnour for STEEL — luxury steel home decor.",
+    title: lang === "ar" ? "العروض والخصومات | Elnour Home - النور هوم" : "Offers & Discounts | Elnour Home",
+    description: lang === "ar" ? "اكشف أكواد الخصم النشطة من Elnour Home — أثاث وديكورات استيل فاخرة." : "Discover active discount codes from Elnour Home — luxury furniture and steel decor.",
     path: "/offers",
   });
 
@@ -61,7 +61,7 @@ export default function OffersPage() {
           <Badge variant="secondary" className="mb-3"><Gift className="h-4 w-4 text-[#ad842f]" /><span className="ms-1">{lang === "ar" ? "عروض حصرية" : "Exclusive Offers"}</span></Badge>
           <h1 className="text-3xl font-bold sm:text-4xl">{lang === "ar" ? "العروض والخصومات" : "Offers & Discounts"}</h1>
           <p className="mt-2 text-muted-foreground">
-            {lang === "ar" ? "أكواد خصم نشطة من Elnour for STEEL — استخدمها في السلة أو عند إتمام الطلب." : "Active discount codes from Elnour for STEEL — apply them in the cart or at checkout."}
+            {lang === "ar" ? "أكواد خصم نشطة من Elnour Home — استخدمها في السلة أو عند إتمام الطلب." : "Active discount codes from Elnour Home — apply them in the cart or at checkout."}
           </p>
         </div>
 

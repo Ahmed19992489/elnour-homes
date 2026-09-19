@@ -95,7 +95,7 @@ export function buildOrderInvoiceHtml(invoice: InvoiceData) {
   <body>
     <main class="invoice">
       <header class="header">
-        <div><div class="brand">Elnour for STEEL</div><p class="subtitle">${escapeInvoiceText(label("فاتورة طلب", "Order Invoice"))}</p></div>
+        <div><div class="brand">Elnour Home</div><p class="subtitle">${escapeInvoiceText(label("فاتورة طلب", "Order Invoice"))}</p></div>
         <div class="order-number">${escapeInvoiceText(label("طلب رقم", "Order"))} #${invoice.orderId}<br /><span class="status">${escapeInvoiceText(invoice.status)}</span></div>
       </header>
       <section><h2>${escapeInvoiceText(label("بيانات العميل والتوصيل", "Customer and delivery details"))}</h2><table><tbody>

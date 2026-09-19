@@ -17,7 +17,7 @@ var init_env = __esm({
       cookieSecret: process.env.JWT_SECRET || process.env.COOKIE_SECRET || "elnour-steel-secret-key-jwt-2026-production",
       databaseUrl: process.env.DATABASE_URL ?? "",
       oAuthServerUrl: process.env.OAUTH_SERVER_URL ?? "",
-      ownerOpenId: process.env.OWNER_OPEN_ID || "admin-01121748885",
+      ownerOpenId: process.env.OWNER_OPEN_ID || "admin-01118182424",
       isProduction: process.env.NODE_ENV === "production",
       forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
       forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? ""
@@ -1283,7 +1283,7 @@ async function notifyOrderCustomer(order, event, options = {}) {
     });
     return { delivered: false, reason: !recipient ? "no_recipient" : "email_not_configured" };
   }
-  const origin = process.env.CANONICAL_ORIGIN || "https://elnoursteel-eexiztdb.manus.space";
+  const origin = process.env.CANONICAL_ORIGIN || "https://elnourhomes.com";
   const orderUrl = `${origin}/account/orders/${order.id}`;
   const safeName = escapeHtml(order.customerName || "\u0639\u0645\u064A\u0644\u0646\u0627 \u0627\u0644\u0639\u0632\u064A\u0632");
   const safeProduct = escapeHtml(order.productName || "\u0637\u0644\u0628\u0643");
@@ -1298,7 +1298,7 @@ async function notifyOrderCustomer(order, event, options = {}) {
         <p style="margin:0"><strong>\u0627\u0644\u062D\u0627\u0644\u0629 \u0627\u0644\u062D\u0627\u0644\u064A\u0629:</strong> ${escapeHtml(copy.statusLabel)}</p>
       </section>
       <a href="${orderUrl}" style="display:inline-block;background:#9f711b;color:#fff;text-decoration:none;padding:12px 18px;border-radius:8px">\u0639\u0631\u0636 \u062A\u0641\u0627\u0635\u064A\u0644 \u0627\u0644\u0637\u0644\u0628</a>
-      <p style="color:#68625a;font-size:12px;margin-top:28px">Elnour for STEEL</p>
+      <p style="color:#68625a;font-size:12px;margin-top:28px">Elnour Home</p>
     </main>`;
   try {
     const response = await fetch("https://api.resend.com/emails", {
@@ -1723,7 +1723,7 @@ var appRouter = router({
           input.utmSource ? `\u0645\u0635\u062F\u0631 \u0627\u0644\u0625\u0639\u0644\u0627\u0646: ${input.utmSource}` : ""
         ].filter(Boolean).join("\n");
         await notifyOwner({
-          title: "\u0637\u0644\u0628 \u062C\u062F\u064A\u062F - Elnour for STEEL",
+          title: "\u0637\u0644\u0628 \u062C\u062F\u064A\u062F - Elnour Home",
           content: orderDetails
         });
         notificationSent = true;
@@ -1864,7 +1864,7 @@ var appRouter = router({
           input.utmSource ? `\u0645\u0635\u062F\u0631 \u0627\u0644\u0625\u0639\u0644\u0627\u0646: ${input.utmSource}` : ""
         ].filter(Boolean).join("\n");
         await notifyOwner({
-          title: "\u0637\u0644\u0628 \u0633\u0644\u0629 \u062C\u062F\u064A\u062F - Elnour for STEEL",
+          title: "\u0637\u0644\u0628 \u0633\u0644\u0629 \u062C\u062F\u064A\u062F - Elnour Home",
           content: orderDetails
         });
         notificationSent = true;
@@ -2286,7 +2286,7 @@ var appRouter = router({
       })
     ).mutation(async ({ input }) => {
       const normalized = normalizePhone(input.phone);
-      const expected = normalized === normalizePhone("01118182424") ? process.env.ADMIN_PHONE_1_PASSWORD : normalized === normalizePhone("01121748885") ? process.env.ADMIN_PHONE_2_PASSWORD : void 0;
+      const expected = normalized === normalizePhone("01118182424") ? process.env.ADMIN_PHONE_1_PASSWORD : normalized === normalizePhone("01114323218") ? process.env.ADMIN_PHONE_2_PASSWORD : void 0;
       if (!expected || expected !== input.password) {
         throw new Error(
           "\u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 \u0644\u0627 \u062A\u062A\u0637\u0627\u0628\u0642 \u0645\u0639 \u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 \u0627\u0644\u0645\u0633\u062C\u0644\u0629 \u0644\u0647\u0630\u0627 \u0627\u0644\u0631\u0642\u0645 \u0641\u064A \u0625\u0639\u062F\u0627\u062F\u0627\u062A \u0627\u0644\u0645\u0648\u0642\u0639"
