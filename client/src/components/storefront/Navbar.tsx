@@ -10,12 +10,14 @@ import {
   Search,
   Sparkles,
   Globe,
+  ShieldCheck,
 } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { useWishlist } from "@/contexts/WishlistContext";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import CustomerAuthDialog from "./CustomerAuthDialog";
 
 const BUSINESS_PHONE = "01118182424";
 
@@ -26,6 +28,7 @@ export default function Navbar() {
   const { lang, setLang, isRTL, t } = useLanguage();
   const { user, isAuthenticated } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [customerAuthOpen, setCustomerAuthOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -149,12 +152,34 @@ export default function Navbar() {
           </Link>
 
           {/* User Account / Login */}
-          <Link href={isAuthenticated ? (user?.role === "admin" || user?.role === "moderator" ? "/admin" : "/account") : "/admin-login"}>
-            <Button variant="outline" size="sm" className="hidden sm:inline-flex rounded-xl gap-2 font-bold border-[#d5af58]/40 hover:border-[#d5af58]">
+          {isAuthenticated ? (
+            <div className="hidden sm:flex items-center gap-1.5">
+              <Link href="/account">
+                <Button variant="outline" size="sm" className="rounded-xl gap-2 font-bold border-[#d5af58]/40 hover:border-[#d5af58]">
+                  <User className="h-4 w-4 text-[#a8822d]" />
+                  <span>{lang === "ar" ? "حسابي" : "My Account"}</span>
+                </Button>
+              </Link>
+              {(user?.role === "admin" || user?.role === "moderator") && (
+                <Link href="/admin">
+                  <Button size="sm" className="rounded-xl gap-1.5 font-bold bg-[#24211d] text-white hover:bg-[#ad842f] text-xs">
+                    <ShieldCheck className="h-3.5 w-3.5 text-[#d5af58]" />
+                    <span>{lang === "ar" ? "لوحة الإدارة ↗" : "Admin ↗"}</span>
+                  </Button>
+                </Link>
+              )}
+            </div>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCustomerAuthOpen(true)}
+              className="hidden sm:inline-flex rounded-xl gap-2 font-bold border-[#d5af58]/40 hover:border-[#d5af58]"
+            >
               <User className="h-4 w-4 text-[#a8822d]" />
-              <span>{isAuthenticated ? (user?.role === "admin" ? "لوحة الإدارة" : user?.role === "moderator" ? "لوحة الموظف" : "حسابي") : "دخول"}</span>
+              <span>{lang === "ar" ? "تسجيل الدخول" : "Sign In"}</span>
             </Button>
-          </Link>
+          )}
 
           {/* Mobile menu button */}
           <button
@@ -204,12 +229,35 @@ export default function Navbar() {
               </Link>
             ))}
             <div className="pt-4 flex flex-col gap-3">
-              <Link href={isAuthenticated ? "/account" : "/admin-login"} onClick={() => setMobileMenuOpen(false)}>
-                <Button className="w-full bg-[#24211d] text-white hover:bg-[#a8822d]">
+              {isAuthenticated ? (
+                <>
+                  <Link href="/account" onClick={() => setMobileMenuOpen(false)}>
+                    <Button className="w-full bg-[#24211d] text-white hover:bg-[#a8822d]">
+                      <User className="ml-2 h-4 w-4" />
+                      {lang === "ar" ? "حسابي (طلباتي وفواتيري)" : "My Account"}
+                    </Button>
+                  </Link>
+                  {(user?.role === "admin" || user?.role === "moderator") && (
+                    <Link href="/admin" onClick={() => setMobileMenuOpen(false)}>
+                      <Button variant="outline" className="w-full border-[#d5af58] text-[#8b6821] hover:bg-[#faf8f5]">
+                        <ShieldCheck className="ml-2 h-4 w-4" />
+                        {lang === "ar" ? "لوحة تحكم الإدارة (CRM) ↗" : "Admin CRM Portal ↗"}
+                      </Button>
+                    </Link>
+                  )}
+                </>
+              ) : (
+                <Button
+                  className="w-full bg-[#24211d] text-white hover:bg-[#a8822d]"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    setCustomerAuthOpen(true);
+                  }}
+                >
                   <User className="ml-2 h-4 w-4" />
-                  {isAuthenticated ? "لوحة التحكم / حسابي" : "تسجيل الدخول"}
+                  {lang === "ar" ? "تسجيل دخول العميل" : "Customer Sign In"}
                 </Button>
-              </Link>
+              )}
               <a
                 href={`https://wa.me/20${BUSINESS_PHONE.slice(1)}`}
                 target="_blank"
@@ -223,6 +271,9 @@ export default function Navbar() {
           </nav>
         </div>
       )}
+
+      {/* Customer Authentication Dialog */}
+      <CustomerAuthDialog open={customerAuthOpen} onOpenChange={setCustomerAuthOpen} />
     </header>
   );
 }

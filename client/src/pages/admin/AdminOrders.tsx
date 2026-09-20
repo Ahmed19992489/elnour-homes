@@ -169,16 +169,32 @@ export default function AdminOrders() {
     orderUrl: `${window.location.origin}/account/orders/${order.id}`,
   });
 
-  if (!isAuthenticated || user?.role !== 'admin') {
+  if (!isAuthenticated) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center p-8 text-center bg-[#faf8f5]">
         <div className="max-w-md w-full rounded-2xl border border-[#e0dacd] bg-white p-8 shadow-md">
-          <h1 className="text-2xl font-bold text-[#24211d]">لوحة التحكم للإدارة فقط</h1>
+          <h1 className="text-2xl font-bold text-[#24211d]">لوحة الإدارة والـ CRM فقط</h1>
           <p className="mt-3 text-sm text-muted-foreground">
-            يرجى تسجيل الدخول للوصول إلى إدارة الطلبات.
+            يرجى تسجيل الدخول برقم هاتف الإدارة للوصول إلى إدارة الطلبات والـ CRM.
           </p>
-          <Button className="mt-6 w-full bg-[#24211d] text-white hover:bg-[#ad842f]" onClick={() => window.location.assign("/admin-login")}>
-            تسجيل الدخول للإدارة
+          <Button className="mt-6 w-full bg-[#24211d] text-white hover:bg-[#ad842f]" onClick={() => window.location.assign("/admin/login")}>
+            تسجيل دخول الإدارة (CRM)
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (user?.role !== 'admin') {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center p-8 text-center bg-[#faf8f5]">
+        <div className="max-w-md w-full rounded-2xl border border-[#e0dacd] bg-white p-8 shadow-md">
+          <h1 className="text-xl font-bold text-[#24211d]">إدارة الطلبات والـ CRM للإدارة فقط</h1>
+          <p className="mt-3 text-sm text-muted-foreground">
+            حسابك مسجل كعميل. يمكنك متابعة طلباتك الخاصة من خلال صفحة حسابك.
+          </p>
+          <Button className="mt-6 w-full bg-[#26231e] text-white hover:bg-[#ad842f]" onClick={() => window.location.assign("/account")}>
+            الانتقال إلى حسابي ومتابعة طلباتي
           </Button>
         </div>
       </div>

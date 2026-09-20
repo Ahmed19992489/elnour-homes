@@ -5,7 +5,7 @@ import { trpc } from "@/lib/trpc";
 import { buildBusinessWhatsAppUrl } from "@/lib/orderWhatsApp";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Facebook, Heart, Instagram, Menu, MessageCircle, Search, Send, ShoppingCart, UserCheck, X } from "lucide-react";
+import { Facebook, Heart, Instagram, Menu, MessageCircle, Search, Send, ShoppingCart, UserCheck, X, ShieldCheck } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
 import { useWishlist } from "@/contexts/WishlistContext";
 import { cartTotals } from "@/lib/cart";
@@ -195,11 +195,20 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
               {cartCount > 0 ? <span className="absolute -top-1.5 -end-1.5 flex h-4.5 min-w-4.5 items-center justify-center rounded-full bg-[#ad842f] px-1 text-[10px] font-black text-white">{cartCount}</span> : null}
             </Link>
             <Button variant="ghost" size="sm" className="font-semibold" onClick={() => setLang(lang === "ar" ? "en" : "ar")}>{copy.language}</Button>
-            <Button variant="ghost" size="sm" onClick={() => setLocation("/admin-login")} className="text-[#8b6821]">{copy.adminLogin}</Button>
-            {user ? <>
-              <Button variant="outline" size="sm" onClick={() => setLocation(isAdmin ? "/admin" : "/account")}>{isAdmin ? copy.dashboard : copy.account}</Button>
-              <Button variant="ghost" size="sm" onClick={logout}>{copy.logout}</Button>
-            </> : !loading ? <Button variant="outline" size="sm" onClick={() => setAuthDialogOpen(true)}>{copy.login}</Button> : null}
+            {user ? (
+              <div className="flex items-center gap-1.5">
+                <Button variant="outline" size="sm" onClick={() => setLocation("/account")}>{copy.account}</Button>
+                {isAdmin && (
+                  <Button size="sm" className="bg-[#24211d] text-white hover:bg-[#ad842f] text-xs font-bold gap-1" onClick={() => setLocation("/admin")}>
+                    <ShieldCheck className="h-3.5 w-3.5 text-[#d5af58]" />
+                    {copy.dashboard}
+                  </Button>
+                )}
+                <Button variant="ghost" size="sm" onClick={logout}>{copy.logout}</Button>
+              </div>
+            ) : !loading ? (
+              <Button variant="outline" size="sm" onClick={() => setAuthDialogOpen(true)}>{copy.login}</Button>
+            ) : null}
             <Button size="sm" className="bg-[#26231e] text-white hover:bg-[#ad842f]" onClick={() => window.open(WHATSAPP_LINK, "_blank", "noopener,noreferrer")}>{copy.contact}</Button>
           </div>
           <div className="flex items-center gap-1 md:hidden">
@@ -228,8 +237,20 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
             <button className="rounded-md px-3 py-2 text-right hover:bg-[#eee9dd]" onClick={() => handleNav("/")}>{copy.home}</button>
             {navItems.map((item) => <button key={item.href} className="rounded-md px-3 py-2 text-right hover:bg-[#eee9dd]" onClick={() => handleNav(item.href)}>{lang === "ar" ? item.ar : item.en}</button>)}
             <div className="mt-2 grid grid-cols-2 gap-2 border-t border-[#d9d3c4] pt-3">
-              <Button variant="ghost" className="text-[#8b6821]" onClick={() => handleNav("/admin-login")}>{copy.adminLogin}</Button>
-              {user ? <><Button variant="outline" onClick={() => handleNav(isAdmin ? "/admin" : "/account")}>{isAdmin ? copy.dashboard : copy.account}</Button><Button variant="ghost" onClick={logout}>{copy.logout}</Button></> : <Button variant="outline" className="col-span-2" onClick={() => { setMenuOpen(false); setAuthDialogOpen(true); }}>{copy.login}</Button>}
+              {user ? (
+                <>
+                  <Button variant="outline" onClick={() => handleNav("/account")}>{copy.account}</Button>
+                  {isAdmin && (
+                    <Button className="bg-[#24211d] text-white hover:bg-[#ad842f]" onClick={() => handleNav("/admin")}>
+                      <ShieldCheck className="ms-1 h-3.5 w-3.5 text-[#d5af58]" />
+                      {copy.dashboard}
+                    </Button>
+                  )}
+                  <Button variant="ghost" onClick={logout}>{copy.logout}</Button>
+                </>
+              ) : (
+                <Button variant="outline" className="col-span-2" onClick={() => { setMenuOpen(false); setAuthDialogOpen(true); }}>{copy.login}</Button>
+              )}
               <Button className="col-span-2 bg-[#26231e] text-white" onClick={() => window.open(WHATSAPP_LINK, "_blank", "noopener,noreferrer")}>{copy.contact}</Button>
             </div>
           </nav>

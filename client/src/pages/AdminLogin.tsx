@@ -82,12 +82,12 @@ export default function AdminLogin() {
           <ShieldCheck className="h-9 w-9 text-[#ad842f]" />
         </div>
         <h1 className="text-3xl font-black tracking-tight text-[#24211d]">
-          {isRTL ? "دخول لوحة التحكم" : "Admin login"}
+          {isRTL ? "بوابة إدارة المتجر والـ CRM" : "Store Management & CRM Portal"}
         </h1>
         <p className="mt-2 text-sm text-[#746c60]">
           {isRTL
-            ? "دخول مخصص لأرقام الإدارة المصرّح لها فقط. هذا الدخول منفصل تماماً عن حسابات العملاء."
-            : "Restricted to authorized admin phone numbers only. This login is fully separate from customer accounts."}
+            ? "بوابة مخصصة حصرياً لإدارة المتجر والـ CRM ومتابعة العمليات. هذا المدخل منفصل تماماً عن حسابات وتسوق العملاء."
+            : "Dedicated portal exclusively for Store Management & CRM operations. Fully isolated from customer accounts."}
         </p>
       </div>
 
@@ -177,9 +177,21 @@ export default function AdminLogin() {
         </div>
       </form>
 
+      <div className="rounded-2xl border border-dashed border-[#d9d3c4] bg-[#faf8f4] p-4 text-center">
+        <p className="text-xs font-medium text-[#746c60]">
+          {isRTL ? "هل أنت عميل وتبحث عن متابعة طلباتك أو تسجيل حسابك؟" : "Looking for your customer account or order tracking?"}
+        </p>
+        <Link
+          href="/account"
+          className="mt-2 inline-flex items-center gap-1 text-sm font-bold text-[#ad842f] hover:underline"
+        >
+          {isRTL ? "الانتقال إلى حسابات العملاء ومتابعة الطلبات ↗" : "Go to Customer Account & Orders ↗"}
+        </Link>
+      </div>
+
       <div className="text-center">
         <Link href="/" className="text-sm font-semibold text-[#8b6821] transition hover:text-[#ad842f]">
-          {isRTL ? "← العودة إلى المتجر" : "Back to store →"}
+          {isRTL ? "← العودة إلى المتجر الرئيسي" : "Back to store home →"}
         </Link>
       </div>
     </div>

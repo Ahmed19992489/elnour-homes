@@ -79,6 +79,7 @@ function Router() {
         <Route path="/story" component={() => <ContentPage sectionKey="story" />} />
         <Route path="/work" component={WorkPage} />
         <Route path="/our-work" component={WorkPage} />
+        <Route path="/admin/login" component={AdminLogin} />
         <Route path="/admin-login" component={AdminLogin} />
         <Route path="/admin/orders" component={AdminOrders} />
         <Route path="/admin/products" component={AdminProducts} />

@@ -84,11 +84,11 @@ export default function DashboardLayout({
             </p>
           </div>
           <Button
-            onClick={() => setLocation("/admin-login")}
+            onClick={() => setLocation("/admin/login")}
             size="lg"
             className="w-full bg-[#24211d] text-white hover:bg-[#ad842f] shadow-lg hover:shadow-xl transition-all"
           >
-            تسجيل الدخول إلى لوحة التحكم
+            تسجيل الدخول إلى لوحة التحكم (CRM)
           </Button>
         </div>
       </div>

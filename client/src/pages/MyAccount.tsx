@@ -225,6 +225,30 @@ export default function MyAccount() {
   return (
     <PublicLayout>
       <div className="container py-10">
+        {user?.role === "admin" && (
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-amber-300/80 bg-gradient-to-r from-amber-50 to-orange-50/60 p-4 text-amber-950 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-200/80 text-amber-900 shadow-inner">
+                <ShieldCheck className="h-6 w-6 text-[#ad842f]" />
+              </div>
+              <div>
+                <p className="text-sm font-bold flex items-center gap-2">
+                  <span>{t("أنت مسجل الدخول بصلاحية مدير (Admin)", "Signed in as Administrator")}</span>
+                  <Badge className="bg-[#ad842f] text-white border-0 text-[10px] px-2 py-0.5">لوحة الإدارة منفصلة</Badge>
+                </p>
+                <p className="text-xs text-amber-800/90 mt-0.5">
+                  {t("هذه الصفحة مخصصة لطلبات وحسابات العملاء. للدخول إلى إدارة المتجر ونظام CRM الخاص بالإدارة:", "This view is for customer orders. To access Store Management & Admin CRM:")}
+                </p>
+              </div>
+            </div>
+            <Link href="/admin">
+              <Button size="sm" className="bg-[#24211d] text-white hover:bg-[#ad842f] font-bold shadow transition-all hover:scale-105">
+                {t("الانتقال إلى لوحة الإدارة والـ CRM ↗", "Go to Admin CRM Portal ↗")}
+              </Button>
+            </Link>
+          </div>
+        )}
+
         {/* Page header with quick contact actions */}
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
