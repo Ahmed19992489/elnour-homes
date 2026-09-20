@@ -758,6 +758,7 @@ export async function getOrderReport() {
     .select({
       id: orders.id,
       orderValue: orders.totalAfterDiscount,
+      productPrice: orders.productPrice,
       productId: orders.productId,
       productName: orders.productName,
       utmSource: orders.utmSource,
@@ -778,7 +779,9 @@ export async function getOrderReport() {
   for (const o of all) {
     const key = [o.customerEmail || "", o.customerPhone || ""].filter(Boolean).join("|");
     if (key) customerKeys.add(key);
-    const value = Number(o.orderValue ?? 0) || 0;
+    const rawVal = o.orderValue || o.productPrice || "0";
+    const cleanNum = String(rawVal).replace(/[^0-9.]/g, "");
+    const value = parseFloat(cleanNum) || 0;
     if (o.status === "cancelled") { totals.cancelledRevenue += value; continue; }
     totals.totalRevenue += value;
     const monthKey = o.createdAt
@@ -837,7 +840,7 @@ export async function getOrdersForExport(filter: { status?: string; from?: Date;
     product_name: o.productName ?? "",
     price: o.productPrice ?? "",
     discount: o.discountValue ?? "",
-    total: o.totalAfterDiscount ?? "",
+    total: o.totalAfterDiscount || o.productPrice || "",
     coupon: o.couponCode ?? "",
     size: o.selectedSize ?? "",
     color: o.selectedColor ?? "",

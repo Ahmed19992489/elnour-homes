@@ -1091,6 +1091,7 @@ async function getOrderReport() {
   const all = await db.select({
     id: orders.id,
     orderValue: orders.totalAfterDiscount,
+    productPrice: orders.productPrice,
     productId: orders.productId,
     productName: orders.productName,
     utmSource: orders.utmSource,
@@ -1108,7 +1109,9 @@ async function getOrderReport() {
   for (const o of all) {
     const key = [o.customerEmail || "", o.customerPhone || ""].filter(Boolean).join("|");
     if (key) customerKeys.add(key);
-    const value = Number(o.orderValue ?? 0) || 0;
+    const rawVal = o.orderValue || o.productPrice || "0";
+    const cleanNum = String(rawVal).replace(/[^0-9.]/g, "");
+    const value = parseFloat(cleanNum) || 0;
     if (o.status === "cancelled") {
       totals.cancelledRevenue += value;
       continue;
@@ -1180,7 +1183,7 @@ async function getOrdersForExport(filter) {
     product_name: o.productName ?? "",
     price: o.productPrice ?? "",
     discount: o.discountValue ?? "",
-    total: o.totalAfterDiscount ?? "",
+    total: o.totalAfterDiscount || o.productPrice || "",
     coupon: o.couponCode ?? "",
     size: o.selectedSize ?? "",
     color: o.selectedColor ?? "",
@@ -1709,7 +1712,7 @@ var appRouter = router({
         discountType: couponApplied.valid ? couponApplied.discount > 0 ? "percent" : "none" : void 0,
         discountValue: couponApplied.valid ? String(couponApplied.discount) : void 0,
         referralCodeUsed: appliedReferralCode,
-        totalAfterDiscount: couponApplied.valid ? String(Math.max(0, (input.orderValue ?? input.productPrice ?? 0) - couponApplied.discount)) : void 0
+        totalAfterDiscount: couponApplied.valid ? String(Math.max(0, (input.orderValue ?? input.productPrice ?? 0) - couponApplied.discount)) : input.productPrice ? String(input.productPrice) : product ? String(product.price) : void 0
       });
       let notificationSent = false;
       try {
@@ -1842,7 +1845,7 @@ var appRouter = router({
         couponCode: couponApplied.valid ? input.couponCode?.trim().toUpperCase() : void 0,
         discountType: couponApplied.valid ? couponApplied.discount > 0 ? "percent" : "none" : void 0,
         discountValue: couponApplied.valid ? String(couponApplied.discount) : void 0,
-        totalAfterDiscount: couponApplied.valid ? String(Math.max(0, subtotal - couponApplied.discount)) : void 0,
+        totalAfterDiscount: couponApplied.valid ? String(Math.max(0, subtotal - couponApplied.discount)) : String(beforeDiscount),
         userId: ctx.user?.id,
         utmSource: input.utmSource,
         utmMedium: input.utmMedium,

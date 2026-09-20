@@ -511,7 +511,7 @@ export default function MyAccount() {
                         <span>#{order.id}</span>
                         <span>{order.customerName} — {order.customerPhone}</span>
                         <span>{new Date(order.createdAt).toLocaleString(lang === "ar" ? "ar-EG" : "en-US")}</span>
-                        {order.totalAfterDiscount ? <span>{Number(order.totalAfterDiscount).toLocaleString()} {t("ج.م", "EGP")}</span> : null}
+                        {(order.totalAfterDiscount || (order as any).productPrice) ? <span>{Number(order.totalAfterDiscount || (order as any).productPrice).toLocaleString()} {t("ج.م", "EGP")}</span> : null}
                         {order.selectedSize ? <span>{t("المقاس:", "Size:")} <strong>{order.selectedSize}</strong></span> : null}
                         {order.selectedColor ? <span>{t("اللون:", "Colour:")} <strong>{order.selectedColor}</strong></span> : null}
                       </div>

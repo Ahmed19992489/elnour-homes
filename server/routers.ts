@@ -395,7 +395,7 @@ export const appRouter = router({
           referralCodeUsed: appliedReferralCode,
           totalAfterDiscount: couponApplied.valid
             ? String(Math.max(0, (input.orderValue ?? input.productPrice ?? 0) - couponApplied.discount))
-            : undefined,
+            : (input.productPrice ? String(input.productPrice) : (product ? String(product.price) : undefined)),
         });
 
         // Send notification to owner
@@ -555,7 +555,7 @@ export const appRouter = router({
           discountValue: couponApplied.valid ? String(couponApplied.discount) : undefined,
           totalAfterDiscount: couponApplied.valid
             ? String(Math.max(0, subtotal - couponApplied.discount))
-            : undefined,
+            : String(beforeDiscount),
           userId: ctx.user?.id,
           utmSource: input.utmSource,
           utmMedium: input.utmMedium,
