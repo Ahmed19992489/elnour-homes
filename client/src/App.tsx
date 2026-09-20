@@ -41,6 +41,7 @@ const AdminReports = lazy(() => import("./pages/admin/AdminReports"));
 const AdminStockAlerts = lazy(() => import("./pages/admin/AdminStockAlerts"));
 const AdminSettings = lazy(() => import("./pages/admin/AdminSettings"));
 const AdminAdmins = lazy(() => import("./pages/admin/AdminAdmins"));
+const CookieConsent = lazy(() => import("./components/storefront/CookieConsent"));
 
 // ── Loading spinner for lazy pages ──
 function PageLoader() {
@@ -119,6 +120,9 @@ function App() {
           <TooltipProvider>
             <Toaster richColors closeButton position="top-center" />
             <Router />
+            <Suspense fallback={null}>
+              <CookieConsent />
+            </Suspense>
           </TooltipProvider>
           </WishlistProvider>
           </CartProvider>

@@ -204,6 +204,7 @@ export default function ProductDetail() {
   });
   const [orderOpen, setOrderOpen] = useState(false);
   const [selectedImage, setSelectedImage] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   const [selectedSize, setSelectedSize] = useState("");
   const [selectedColor, setSelectedColor] = useState("");
   const [orderForm, setOrderForm] = useState({
@@ -505,19 +506,92 @@ export default function ProductDetail() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Images */}
           <div className="space-y-4">
-            <div className="aspect-square rounded-2xl overflow-hidden bg-muted">
+            {/* Main Image with Zoom */}
+            <div
+              className="aspect-square rounded-2xl overflow-hidden bg-muted relative cursor-zoom-in group"
+              onMouseMove={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                const x = ((e.clientX - rect.left) / rect.width) * 100;
+                const y = ((e.clientY - rect.top) / rect.height) * 100;
+                const img = e.currentTarget.querySelector("img");
+                if (img) {
+                  img.style.transformOrigin = `${x}% ${y}%`;
+                  img.style.transform = "scale(2.5)";
+                }
+              }}
+              onMouseLeave={(e) => {
+                const img = e.currentTarget.querySelector("img");
+                if (img) {
+                  img.style.transform = "scale(1)";
+                }
+              }}
+              onClick={() => images.length > 0 && setLightboxOpen(true)}
+            >
               {images.length > 0 ? (
-                <img
-                  src={images[selectedImage]}
-                  alt={product.nameAr}
-                  className="w-full h-full object-cover"
-                />
+                <>
+                  <img
+                    src={images[selectedImage]}
+                    alt={product.nameAr}
+                    className="w-full h-full object-cover transition-transform duration-200 ease-out"
+                    draggable={false}
+                  />
+                  {/* Zoom hint */}
+                  <div className="absolute top-3 left-3 bg-black/50 backdrop-blur-sm text-white text-xs px-2.5 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none flex items-center gap-1.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/><path d="M11 8v6"/><path d="M8 11h6"/></svg>
+                    {lang === "ar" ? "حرّك الماوس للتكبير" : "Hover to zoom"}
+                  </div>
+                </>
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                   <Star className="h-16 w-16 opacity-30" />
                 </div>
               )}
             </div>
+
+            {/* Lightbox (fullscreen image viewer) */}
+            {lightboxOpen && images.length > 0 && (
+              <div
+                className="fixed inset-0 z-[9999] bg-black/95 flex items-center justify-center"
+                onClick={() => setLightboxOpen(false)}
+              >
+                <button
+                  className="absolute top-4 right-4 z-10 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+                  onClick={() => setLightboxOpen(false)}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                </button>
+                {/* Prev/Next arrows */}
+                {images.length > 1 && (
+                  <>
+                    <button
+                      className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+                      onClick={(e) => { e.stopPropagation(); setSelectedImage((selectedImage - 1 + images.length) % images.length); }}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m15 18-6-6 6-6"/></svg>
+                    </button>
+                    <button
+                      className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+                      onClick={(e) => { e.stopPropagation(); setSelectedImage((selectedImage + 1) % images.length); }}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m9 18 6-6-6-6"/></svg>
+                    </button>
+                  </>
+                )}
+                <img
+                  src={images[selectedImage]}
+                  alt={product.nameAr}
+                  className="max-w-[90vw] max-h-[90vh] object-contain select-none"
+                  onClick={(e) => e.stopPropagation()}
+                  draggable={false}
+                  style={{ touchAction: "pinch-zoom" }}
+                />
+                {/* Image counter */}
+                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/50 backdrop-blur-sm text-white text-sm px-4 py-2 rounded-full">
+                  {selectedImage + 1} / {images.length}
+                </div>
+              </div>
+            )}
+
             {images.length > 1 && (
               <div>
                 <p className="mb-2 text-sm font-semibold text-muted-foreground">{lang === "ar" ? "صور وزوايا المنتج" : "Product views & details"}</p>
@@ -990,6 +1064,53 @@ export default function ProductDetail() {
         </div>
 
         <ReviewSection productId={Number(id)} title={lang === "ar" ? product.nameAr : product.name} />
+
+        {/* Product Recommendations */}
+        {related.length > 0 && (
+          <div className="mt-12">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="h-8 w-1 rounded-full bg-gradient-to-b from-[#d5af58] to-[#96702a]" />
+              <h2 className="text-2xl font-black text-[#24211d]">
+                {lang === "ar" ? "منتجات قد تعجبك" : "You might also like"}
+              </h2>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {related.map((p) => {
+                const img = getPrimaryProductImage(p);
+                const pName = lang === "ar" ? p.nameAr : p.name;
+                const pPrice = Number(p.price) || 0;
+                return (
+                  <Link
+                    key={p.id}
+                    href={`/product/${p.id}`}
+                    className="group block rounded-2xl overflow-hidden border border-[#e5e0d4] bg-white hover:shadow-lg transition-all duration-300"
+                  >
+                    <div className="aspect-square overflow-hidden bg-muted">
+                      {img ? (
+                        <img
+                          src={img}
+                          alt={pName}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                          <Star className="h-10 w-10 opacity-20" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-3">
+                      <p className="text-sm font-bold text-[#24211d] line-clamp-2 mb-1">{pName}</p>
+                      <p className="text-sm font-black text-[#96702a]">
+                        {formatPrice(pPrice)} <span className="text-xs font-medium text-muted-foreground">{lang === "ar" ? "ج.م" : "EGP"}</span>
+                      </p>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Mobile sticky order bar: single action for ad conversions */}

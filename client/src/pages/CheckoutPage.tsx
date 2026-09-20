@@ -61,6 +61,8 @@ export default function CheckoutPage() {
     setHydrated(true);
   }, []);
 
+  const [paymentMethod, setPaymentMethod] = useState<"cod" | "instapay" | "wallet">("cod");
+
   const productIds = useMemo(
     () => Array.from(new Set(items.map((i) => i.productId))),
     [items],
@@ -333,6 +335,63 @@ export default function CheckoutPage() {
                 )}
               </div>
 
+              {/* Payment Methods */}
+              <div className="space-y-3">
+                <Label className="text-base font-semibold">{t("طريقة الدفع", "Payment Method")}</Label>
+                <div className="grid gap-2">
+                  {/* Cash on Delivery */}
+                  <label className={`flex items-center gap-3 p-3.5 rounded-xl border-2 cursor-pointer transition-all ${paymentMethod === "cod" ? "border-[#d5af58] bg-[#faf8f5]" : "border-border/50 hover:border-border"}`}>
+                    <input type="radio" name="payment" value="cod" checked={paymentMethod === "cod"} onChange={() => setPaymentMethod("cod")} className="accent-[#d5af58]" />
+                    <div className="flex items-center gap-2 flex-1">
+                      <span className="text-xl">💵</span>
+                      <div>
+                        <p className="font-semibold text-sm">{t("كاش عند الاستلام", "Cash on Delivery")}</p>
+                        <p className="text-xs text-muted-foreground">{t("ادفع نقدًا عند استلام الطلب", "Pay cash when you receive your order")}</p>
+                      </div>
+                    </div>
+                  </label>
+
+                  {/* InstaPay */}
+                  <label className={`flex items-center gap-3 p-3.5 rounded-xl border-2 cursor-pointer transition-all ${paymentMethod === "instapay" ? "border-[#d5af58] bg-[#faf8f5]" : "border-border/50 hover:border-border"}`}>
+                    <input type="radio" name="payment" value="instapay" checked={paymentMethod === "instapay"} onChange={() => setPaymentMethod("instapay")} className="accent-[#d5af58]" />
+                    <div className="flex items-center gap-2 flex-1">
+                      <span className="text-xl">🏦</span>
+                      <div>
+                        <p className="font-semibold text-sm">{t("إنستاباي", "InstaPay")}</p>
+                        <p className="text-xs text-muted-foreground">{t("حوّل على رقم: 01121748885", "Transfer to: 01121748885")}</p>
+                      </div>
+                    </div>
+                  </label>
+
+                  {/* Cash Wallet */}
+                  <label className={`flex items-center gap-3 p-3.5 rounded-xl border-2 cursor-pointer transition-all ${paymentMethod === "wallet" ? "border-[#d5af58] bg-[#faf8f5]" : "border-border/50 hover:border-border"}`}>
+                    <input type="radio" name="payment" value="wallet" checked={paymentMethod === "wallet"} onChange={() => setPaymentMethod("wallet")} className="accent-[#d5af58]" />
+                    <div className="flex items-center gap-2 flex-1">
+                      <span className="text-xl">📱</span>
+                      <div>
+                        <p className="font-semibold text-sm">{t("محفظة إلكترونية (كاش/فودافون كاش)", "E-Wallet (Cash/Vodafone Cash)")}</p>
+                        <p className="text-xs text-muted-foreground">{t("حوّل على رقم: 01121748885", "Transfer to: 01121748885")}</p>
+                      </div>
+                    </div>
+                  </label>
+                </div>
+
+                {/* Payment instructions */}
+                {(paymentMethod === "instapay" || paymentMethod === "wallet") && (
+                  <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm">
+                    <p className="font-semibold text-[#8b6821] mb-1">
+                      {t("تعليمات الدفع:", "Payment Instructions:")}
+                    </p>
+                    <p className="text-[#6b5a2e]">
+                      {t(
+                        `1. حوّل المبلغ الإجمالي على رقم 01121748885\n2. أرسل صورة إيصال التحويل على واتساب نفس الرقم\n3. سيتم تأكيد طلبك فور التحقق من التحويل`,
+                        `1. Transfer the total amount to 01121748885\n2. Send the transfer receipt screenshot on WhatsApp to the same number\n3. Your order will be confirmed once the transfer is verified`
+                      )}
+                    </p>
+                  </div>
+                )}
+              </div>
+
               <Button type="submit" size="lg" className="w-full" disabled={createCartOrder.isPending}>
                 {createCartOrder.isPending && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
                 {lang === "ar" ? "تأكيد الطلب" : "Place order"}
@@ -340,8 +399,8 @@ export default function CheckoutPage() {
 
               <p className="text-center text-xs text-muted-foreground">
                 {lang === "ar"
-                  ? "بتأكيد الطلب أنت توافق على تواصل فريقنا معك لتأكيد التفاصيل. الدفع عند الاستلام أو عبر واتساب."
-                  : "By placing the order you agree that our team will contact you to confirm the details. Payment on delivery or via WhatsApp."}
+                  ? "بتأكيد الطلب أنت توافق على تواصل فريقنا معك لتأكيد التفاصيل. الدفع كاش عند الاستلام أو عبر إنستاباي أو محفظة إلكترونية."
+                  : "By placing the order you agree that our team will contact you to confirm details. Pay cash on delivery, via InstaPay, or e-wallet."}
               </p>
             </form>
 
