@@ -16,6 +16,7 @@ import { Bell, Copy, Gift, Loader2, Package, Save, ShieldCheck, MessageCircle, P
 import { toast } from "sonner";
 import { Link } from "wouter";
 import { StarRatingDisplay, InteractiveRating } from "@/components/storefront/StarRating";
+import { playStatusUpdateAlert } from "@/lib/soundAlert";
 
 const STATUS_AR: Record<string, string> = {
   new: "طلب جديد",
@@ -49,12 +50,54 @@ export default function MyAccount() {
   const [authOpen, setAuthOpen] = useState(false);
   const utils = trpc.useUtils();
   const { data: profile, isLoading: profileLoading } = trpc.account.me.useQuery(undefined, { enabled: !!user });
-  const { data: myOrders, isLoading: ordersLoading } = trpc.account.orders.useQuery(undefined, { enabled: !!user });
-  const { data: notifications, isLoading: notificationsLoading } = trpc.account.notifications.useQuery(undefined, {
+  const { data: myOrders, isLoading: ordersLoading } = trpc.account.orders.useQuery(undefined, {
     enabled: !!user,
-    refetchInterval: 60_000,
+    refetchInterval: 4_000,
     refetchOnWindowFocus: true,
   });
+  const { data: notifications, isLoading: notificationsLoading } = trpc.account.notifications.useQuery(undefined, {
+    enabled: !!user,
+    refetchInterval: 4_000,
+    refetchOnWindowFocus: true,
+  });
+
+  // Real-time status change detection: notify customer immediately when admin updates an order
+  const previousStatusMapRef = useRef<Map<number, string>>(new Map());
+  const isFirstLoadRef = useRef(true);
+
+  useEffect(() => {
+    if (!myOrders) return;
+
+    if (isFirstLoadRef.current) {
+      isFirstLoadRef.current = false;
+      const initialMap = new Map<number, string>();
+      for (const order of myOrders) {
+        initialMap.set(order.id, order.status);
+      }
+      previousStatusMapRef.current = initialMap;
+      return;
+    }
+
+    for (const order of myOrders) {
+      const prevStatus = previousStatusMapRef.current.get(order.id);
+      if (prevStatus && prevStatus !== order.status) {
+        const statusLabel = (lang === "ar" ? STATUS_AR[order.status] : STATUS_EN[order.status]) || order.status;
+        toast.success(
+          lang === "ar"
+            ? `🚚 تحديث لحظي: حالة طلبك (#${order.id}) أصبحت الآن: [${statusLabel}]`
+            : `🚚 Live update: Your order (#${order.id}) status is now: [${statusLabel}]`,
+          { duration: 8000 }
+        );
+        playStatusUpdateAlert();
+      }
+    }
+
+    const nextMap = new Map<number, string>();
+    for (const order of myOrders) {
+      nextMap.set(order.id, order.status);
+    }
+    previousStatusMapRef.current = nextMap;
+  }, [myOrders, lang]);
   const { data: contact } = trpc.contactInfo.get.useQuery();
   const { data: reviewableProducts, isLoading: reviewableLoading } = trpc.reviews.my.useQuery(undefined, {
     enabled: !!user,
@@ -418,13 +461,22 @@ export default function MyAccount() {
           {/* Orders card */}
           <Card id="orders">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Package className="h-5 w-5 text-[#ad842f]" />
-                {t("طلباتي", "My Orders")}
-                {myOrders ? <Badge variant="outline" className="text-xs">{myOrders.length}</Badge> : null}
-              </CardTitle>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Package className="h-5 w-5 text-[#ad842f]" />
+                  {t("طلباتي", "My Orders")}
+                  {myOrders ? <Badge variant="outline" className="text-xs">{myOrders.length}</Badge> : null}
+                </CardTitle>
+                <div className="flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700">
+                  <span className="relative flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+                  </span>
+                  <span>{t("مزامنة حية نشطة", "Live Sync Active")}</span>
+                </div>
+              </div>
               <CardDescription>
-                {t("متابعة حالة كل طلب قمت به من الموقع", "Status of every order you placed through the site")}
+                {t("متابعة حالة كل طلب قمت به من الموقع (يتم التحديث تلقائياً دون الحاجة لتحديث الصفحة)", "Status of your orders (updates automatically in real-time)")}
               </CardDescription>
             </CardHeader>
             <CardContent>

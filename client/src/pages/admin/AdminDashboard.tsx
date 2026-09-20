@@ -9,8 +9,14 @@ import { Button } from "@/components/ui/button";
 export default function AdminDashboard() {
   const { user, isAuthenticated } = useAuth();
 
-  const { data: stats, isLoading } = trpc.orders.stats.useQuery();
-  const { data: newCount } = trpc.orders.newCount.useQuery();
+  const { data: stats, isLoading } = trpc.orders.stats.useQuery(undefined, {
+    refetchInterval: 5_000,
+    refetchOnWindowFocus: true,
+  });
+  const { data: newCount } = trpc.orders.newCount.useQuery(undefined, {
+    refetchInterval: 5_000,
+    refetchOnWindowFocus: true,
+  });
 
   if (!isAuthenticated) {
     return (

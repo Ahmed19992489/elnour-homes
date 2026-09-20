@@ -168,6 +168,11 @@ function DashboardLayoutContent({
     ? [...menuItems, { icon: Users, label: "حسابات المدراء", path: "/admin/admins" }]
     : menuItems;
 
+  const { data: newOrdersCount } = trpc.orders.newCount.useQuery(undefined, {
+    refetchInterval: 5_000,
+    refetchOnWindowFocus: true,
+  });
+
   useEffect(() => {
     if (isCollapsed) {
       setIsResizing(false);
@@ -247,6 +252,11 @@ function DashboardLayoutContent({
                         className={`h-4 w-4 ${isActive ? "text-primary" : ""}`}
                       />
                       <span>{item.label}</span>
+                      {item.path === "/admin/orders" && typeof newOrdersCount === "number" && newOrdersCount > 0 ? (
+                        <span className="ms-auto flex items-center justify-center rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm animate-pulse">
+                          {newOrdersCount} جديد
+                        </span>
+                      ) : null}
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 );

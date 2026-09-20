@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "wouter";
 import { startLogin } from "@/const";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -7,6 +7,7 @@ import { trpc } from "@/lib/trpc";
 import { parseProductImages } from "@/lib/productImages";
 import { createOrderInvoicePdf, orderInvoiceFileName } from "@/lib/orderInvoicePdf";
 import { buildBusinessWhatsAppUrl } from "@/lib/orderWhatsApp";
+import { playStatusUpdateAlert } from "@/lib/soundAlert";
 import PublicLayout from "@/components/storefront/PublicLayout";
 import CustomerAuthDialog from "@/components/storefront/CustomerAuthDialog";
 import { Badge } from "@/components/ui/badge";
@@ -130,8 +131,42 @@ export default function OrderDetails() {
   const { data: contact } = trpc.contactInfo.get.useQuery();
   const { data, isLoading, error, refetch } = trpc.account.orderDetails.useQuery(
     { id: orderId },
-    { enabled: !!user && isValidOrderId, retry: false },
+    {
+      enabled: !!user && isValidOrderId,
+      retry: false,
+      refetchInterval: 3_000,
+      refetchOnWindowFocus: true,
+    },
   );
+
+  // Real-time status watcher for this order
+  const previousStatusRef = useRef<string | null>(null);
+  const isFirstLoadRef = useRef(true);
+
+  useEffect(() => {
+    const currentStatus = data?.order?.status;
+    if (!currentStatus) return;
+
+    if (isFirstLoadRef.current) {
+      isFirstLoadRef.current = false;
+      previousStatusRef.current = currentStatus;
+      return;
+    }
+
+    if (previousStatusRef.current && previousStatusRef.current !== currentStatus) {
+      const statusMeta = STATUS_META[currentStatus as keyof typeof STATUS_META];
+      const statusLabel = (lang === "ar" ? statusMeta?.ar : statusMeta?.en) || currentStatus;
+      toast.success(
+        lang === "ar"
+          ? `🚚 تحديث لحظي: تم تغيير حالة طلبك الآن إلى: [${statusLabel}]`
+          : `🚚 Live update: Your order status is now: [${statusLabel}]`,
+        { duration: 8000 },
+      );
+      playStatusUpdateAlert();
+    }
+
+    previousStatusRef.current = currentStatus;
+  }, [data?.order?.status, lang]);
 
   const t = (ar: string, en: string) => (lang === "ar" ? ar : en);
   const callNumber = (contact?.phone ?? "").replace(/[^0-9+]/g, "");
@@ -288,6 +323,13 @@ export default function OrderDetails() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Badge className={`px-3 py-1.5 text-sm ${status.tone}`}>{lang === "ar" ? status.ar : status.en}</Badge>
+            <div className="flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+              </span>
+              <span>{t("تحديث مباشر نشط", "Live Sync")}</span>
+            </div>
             <Button type="button" className="gap-2 bg-[#26231e] text-white hover:bg-[#ad842f]" onClick={handleInvoiceDownload} disabled={isDownloadingInvoice}>
               {isDownloadingInvoice ? <Loader2 className="h-4 w-4 animate-spin" /> : <ReceiptText className="h-4 w-4" />}
               {t("تنزيل PDF", "Download PDF")}

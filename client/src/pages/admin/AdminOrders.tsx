@@ -15,10 +15,11 @@ import {
   MessageCircle, Eye, Download, FileSpreadsheet, ExternalLink, 
   Tag, Palette, Ruler, CheckCircle2, UserCheck, Calendar
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { buildOrderWhatsAppUrl } from "@/lib/orderWhatsApp";
 import { createOrderInvoicePdf, orderInvoiceFileName } from "@/lib/orderInvoicePdf";
+import { playNewOrderAlert } from "@/lib/soundAlert";
 
 
 const statusColors: Record<string, string> = {
@@ -53,9 +54,51 @@ type StatusType = "new" | "contacted" | "confirmed" | "shipped" | "delivered" | 
 export default function AdminOrders() {
   const { user, isAuthenticated } = useAuth();
   const utils = trpc.useUtils();
-  const { data: orders, isLoading, isFetching, refetch } = trpc.orders.list.useQuery();
-  const { data: stats, refetch: refetchStats } = trpc.orders.stats.useQuery();
+  const { data: orders, isLoading, isFetching, refetch } = trpc.orders.list.useQuery(undefined, {
+    refetchInterval: 4_000,
+    refetchOnWindowFocus: true,
+  });
+  const { data: stats, refetch: refetchStats } = trpc.orders.stats.useQuery(undefined, {
+    refetchInterval: 4_000,
+    refetchOnWindowFocus: true,
+  });
   const { data: contact } = trpc.contactInfo.get.useQuery();
+
+  // Real-time detector for new incoming orders placed by customers
+  const knownOrderIdsRef = useRef<Set<number>>(new Set());
+  const isInitialOrdersLoad = useRef(true);
+
+  useEffect(() => {
+    if (!orders) return;
+
+    if (isInitialOrdersLoad.current) {
+      isInitialOrdersLoad.current = false;
+      const initialIds = new Set<number>();
+      for (const order of orders) {
+        initialIds.add(order.id);
+      }
+      knownOrderIdsRef.current = initialIds;
+      return;
+    }
+
+    const incomingOrders = orders.filter((order) => !knownOrderIdsRef.current.has(order.id));
+    if (incomingOrders.length > 0) {
+      for (const newOrder of incomingOrders) {
+        toast.success(
+          `🔔 طلب جديد ورد للتو! العميل: ${newOrder.customerName || "عميل"} (${newOrder.productName || "منتج"}) بقيمة ${Number(newOrder.totalAfterDiscount || newOrder.productPrice || 0).toLocaleString()} ج.م`,
+          { duration: 10000 },
+        );
+      }
+      playNewOrderAlert();
+      void refetchStats();
+    }
+
+    const nextIds = new Set<number>();
+    for (const order of orders) {
+      nextIds.add(order.id);
+    }
+    knownOrderIdsRef.current = nextIds;
+  }, [orders, refetchStats]);
   
   const [updatingOrderId, setUpdatingOrderId] = useState<number | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
@@ -225,9 +268,16 @@ export default function AdminOrders() {
             <p className="text-xs text-muted-foreground mt-1">عرض وتتبع تفاصيل كل طلب، المقاس واللون المختار، والفواتير</p>
           </div>
           <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 shadow-sm">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500"></span>
+              </span>
+              <span>مزامنة حية نشطة (تحديث تلقائي)</span>
+            </div>
             <Button onClick={handleRefresh} disabled={isFetching} variant="outline" size="sm" className="gap-2">
               <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
-              {isFetching ? "جارٍ التحديث..." : "تحديث الطلبات"}
+              {isFetching ? "جارٍ التحديث..." : "تحديث فوري"}
             </Button>
           </div>
         </div>
