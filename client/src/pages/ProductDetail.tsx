@@ -7,12 +7,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, ArrowRight, Calculator, Check, Heart, MessageCircle, Palette, Ruler, ShoppingCart, Phone, Star, Globe, ShieldCheck, Gem, Paintbrush, Truck, BellRing, Tag, ListChecks } from "lucide-react";
+import { Loader2, ArrowRight, Calculator, Check, Heart, MessageCircle, Palette, Ruler, ShoppingCart, Phone, Star, Globe, ShieldCheck, Gem, Paintbrush, Truck, BellRing, Tag, ListChecks, RotateCcw, Plus, Minus } from "lucide-react";
 import React, { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useCart } from "@/contexts/CartContext";
 import { useWishlist } from "@/contexts/WishlistContext";
+import { useAuth } from "@/_core/hooks/useAuth";
 import PublicLayout from "@/components/storefront/PublicLayout";
 import { getPrimaryProductImage, parseProductImages } from "@/lib/productImages";
 import { UpdateHead } from "@/components/UpdateHead";
@@ -180,10 +181,11 @@ function colorSwatch(name: string) {
 }
 
 export default function ProductDetail() {
-  const { id } = useParams();
+  const { id } = useParams<{ id?: string }>();
   const { lang, t, setLang } = useLanguage();
   const { addItem } = useCart();
   const { isWished, toggle: toggleWishlist } = useWishlist();
+  const { user } = useAuth();
   const utm = getUtmParams();
 
   // Wall calculator state
@@ -207,6 +209,8 @@ export default function ProductDetail() {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [selectedSize, setSelectedSize] = useState("");
   const [selectedColor, setSelectedColor] = useState("");
+  const [directPaymentMethod, setDirectPaymentMethod] = useState<"cod" | "instapay" | "wallet">("cod");
+  const [directQuantity, setDirectQuantity] = useState(1);
   const [orderForm, setOrderForm] = useState({
     customerName: "",
     customerPhone: "",
@@ -223,6 +227,19 @@ export default function ProductDetail() {
     message: string;
     checking: boolean;
   }>({ valid: null, discount: 0, message: "", checking: false });
+
+  // Auto-fill customer info if logged in
+  useEffect(() => {
+    if (user) {
+      setOrderForm((prev) => ({
+        customerName: prev.customerName || user.name || "",
+        customerPhone: prev.customerPhone || user.phone || "",
+        customerEmail: prev.customerEmail || user.email || "",
+        customerAddress: prev.customerAddress || user.address || "",
+        message: prev.message,
+      }));
+    }
+  }, [user]);
 
   // Track pageview on mount
 
@@ -275,6 +292,8 @@ export default function ProductDetail() {
       toast.success(t("orderSuccess"));
       setOrderOpen(false);
       setEmailError("");
+      setDirectQuantity(1);
+      setDirectPaymentMethod("cod");
       setOrderForm({ customerName: "", customerPhone: "", customerEmail: "", customerAddress: "", message: "" });
     },
     onError: (err) => {
@@ -289,7 +308,7 @@ export default function ProductDetail() {
 
   const images = parseProductImages(product?.images);
   const sizes = splitOptions(product?.sizes);
-  const colors = splitOptions(product?.colors);
+  const colors = splitOptions((product as any)?.colors);
   const sizeOptions = parseSizeOptions(product?.sizeOptions);
   const colorOptions = parseColorOptions(product?.colorOptions);
   const specs = useMemo(() => {
@@ -407,7 +426,7 @@ export default function ProductDetail() {
       if (copts.length > 0) {
         setSelectedColor(copts[0].labelAr);
       } else {
-        const clr = splitOptions(product.colors);
+        const clr = splitOptions((product as any)?.colors);
         setSelectedColor(clr[0] || "");
       }
     } else {
@@ -424,6 +443,13 @@ export default function ProductDetail() {
       return;
     }
     setEmailError("");
+
+    const cleanPhone = orderForm.customerPhone.trim().replace(/\s+/g, "");
+    if (!/^(01|\+?20|20)?1[0125][0-9]{8}$/.test(cleanPhone)) {
+      toast.error(lang === "ar" ? "يرجى إدخال رقم هاتف مصري صحيح يبدأ بـ 01" : "Please enter a valid Egyptian phone number starting with 01");
+      return;
+    }
+
     if (sizes.length && !selectedSize) {
       toast.error(lang === "ar" ? "يرجى اختيار المقاس أولاً" : "Please select a size first");
       return;
@@ -432,12 +458,28 @@ export default function ProductDetail() {
       toast.error(lang === "ar" ? "يرجى اختيار اللون أولاً" : "Please select a colour first");
       return;
     }
+
+    const paymentLabel = directPaymentMethod === "instapay"
+      ? (lang === "ar" ? "إنستاباي (01121748885)" : "InstaPay (01121748885)")
+      : directPaymentMethod === "wallet"
+      ? (lang === "ar" ? "محفظة إلكترونية (01121748885)" : "E-Wallet (01121748885)")
+      : (lang === "ar" ? "كاش عند الاستلام" : "Cash on Delivery");
+
+    const orderQty = Math.max(1, directQuantity);
+    const qtyNote = orderQty > 1 ? (lang === "ar" ? `الكمية: ${orderQty}` : `Quantity: ${orderQty}`) : "";
+    const calcOrderTotal = isPerMeter ? undefined : Math.max(0, (finalTotal * orderQty));
+
     createOrder.mutate({
-      customerName: orderForm.customerName,
-      customerPhone: orderForm.customerPhone,
+      customerName: orderForm.customerName.trim(),
+      customerPhone: cleanPhone,
       customerEmail,
-      customerAddress: orderForm.customerAddress || undefined,
-      message: [orderForm.message || "", isPerMeter ? `تسعير بالمتر: ${formatPrice(pricePerMeterValue)} ${currency}/م` : ""].filter(Boolean).join(" | ").trim() || undefined,
+      customerAddress: orderForm.customerAddress.trim() || undefined,
+      message: [
+        orderForm.message.trim(),
+        `${lang === "ar" ? "طريقة الدفع" : "Payment Method"}: ${paymentLabel}`,
+        qtyNote,
+        isPerMeter ? `تسعير بالمتر: ${formatPrice(pricePerMeterValue)} ${currency}/م` : "",
+      ].filter(Boolean).join(" | ").trim() || undefined,
       productId: product?.id,
       productName: product?.nameAr,
       productPrice: isPerMeter ? undefined : (sizePriceValue || undefined),
@@ -445,7 +487,7 @@ export default function ProductDetail() {
       selectedColor: selectedColor || undefined,
       couponCode: couponState.valid ? couponCode.trim() : undefined,
       referralCode: referralCodeInput.trim().toUpperCase() || undefined,
-      orderValue: couponState.valid ? finalTotal : undefined,
+      orderValue: calcOrderTotal,
       orderSource: "web",
       ...utm,
       referrer: document.referrer || undefined,
@@ -838,96 +880,269 @@ export default function ProductDetail() {
                       {lang === "ar" ? "اطلب الآن" : "Order Now"}
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto overscroll-contain sm:max-h-[75vh]">
-                    <DialogHeader>
-                      <DialogTitle>{t("orderFormTitle")}</DialogTitle>
+                  <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto overscroll-contain sm:max-h-[85vh]">
+                    <DialogHeader className="border-b pb-3 text-start">
+                      <DialogTitle className="text-lg font-bold flex items-center gap-2">
+                        <span>🛒</span> {lang === "ar" ? "طلب مباشر وسريع" : "Quick Direct Order"}
+                      </DialogTitle>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {lang === "ar"
+                          ? "أدخل بياناتك وسيتم تأكيد الطلب معك قبل الشحن والتسليم — معاينة وفحص قبل الدفع."
+                          : "Fill your details; our team will confirm before shipping — inspect before paying."}
+                      </p>
                     </DialogHeader>
-                    <form onSubmit={handleOrder} className="space-y-4">
-                      <div className="space-y-2">
-                        <Label>{t("customerName")} *</Label>
-                        <Input
-                          value={orderForm.customerName}
-                          onChange={(e) => setOrderForm({ ...orderForm, customerName: e.target.value })}
-                          required
-                          placeholder={lang === "ar" ? "اكتب اسمك هنا" : "Enter your name"}
-                        />
+                    <form onSubmit={handleOrder} className="space-y-4 pt-1">
+                      {/* Product Summary Card with Variant & Quantity */}
+                      <div className="bg-[#faf8f5] border border-[#e8dfcf] rounded-xl p-3 space-y-2.5">
+                        <div className="flex items-center gap-3">
+                          {images[0] && (
+                            <img
+                              src={images[0]}
+                              alt={displayName}
+                              className="w-14 h-14 rounded-lg object-cover border border-[#e3dbc9] shrink-0 bg-white"
+                            />
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-bold text-[#24211d] truncate">{displayName}</p>
+                            <div className="flex flex-wrap items-center gap-2 mt-1">
+                              {selectedSize && (
+                                <span className="inline-flex items-center gap-1 text-xs bg-white border border-[#e3dbc9] px-2 py-0.5 rounded-md text-[#514c42]">
+                                  <Ruler className="w-3 h-3 text-[#ad842f]" /> {selectedSize}
+                                </span>
+                              )}
+                              {selectedColor && (
+                                <span className="inline-flex items-center gap-1 text-xs bg-white border border-[#e3dbc9] px-2 py-0.5 rounded-md text-[#514c42]">
+                                  <span className="w-2.5 h-2.5 rounded-full border shrink-0" style={{ backgroundColor: colorSwatch(selectedColor) }} />
+                                  {selectedColor}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Quantity and Price */}
+                        <div className="flex items-center justify-between pt-2 border-t border-[#e8dfcf]/70">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground font-medium">{lang === "ar" ? "الكمية:" : "Qty:"}</span>
+                            <div className="inline-flex items-center border border-[#d5af58]/40 rounded-lg bg-white shadow-sm">
+                              <button
+                                type="button"
+                                onClick={() => setDirectQuantity((q) => Math.max(1, q - 1))}
+                                className="px-2.5 py-1 text-[#514c42] hover:text-black transition disabled:opacity-30"
+                                disabled={directQuantity <= 1}
+                                aria-label="Decrease quantity"
+                              >
+                                <Minus className="w-3 h-3" />
+                              </button>
+                              <span className="px-2.5 py-0.5 text-xs font-bold text-[#24211d] min-w-[24px] text-center">
+                                {directQuantity}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setDirectQuantity((q) => q + 1)}
+                                className="px-2.5 py-1 text-[#514c42] hover:text-black transition"
+                                aria-label="Increase quantity"
+                              >
+                                <Plus className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="text-end">
+                            {isPerMeter ? (
+                              <span className="text-xs text-amber-600 font-bold">
+                                {formatPrice(pricePerMeterValue)} {currency} / م
+                              </span>
+                            ) : (
+                              <div className="flex items-baseline gap-1.5 justify-end">
+                                {couponState.valid && couponDiscount > 0 && (
+                                  <span className="text-xs text-green-600 font-bold">
+                                    -{formatPrice(couponDiscount * directQuantity)} {currency}
+                                  </span>
+                                )}
+                                <span className="text-sm font-black text-[#ad842f]">
+                                  {formatPrice(Math.max(0, (finalTotal * directQuantity)))} {currency}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <div className="space-y-2">
-                        <Label>{t("customerPhone")} *</Label>
-                        <Input
-                          value={orderForm.customerPhone}
-                          onChange={(e) => setOrderForm({ ...orderForm, customerPhone: e.target.value })}
-                          required
-                          placeholder="01xxxxxxxxx"
-                          type="tel"
-                        />
+
+                      {/* Customer Contact Details */}
+                      <div className="space-y-3">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-semibold">{t("customerName")} *</Label>
+                          <Input
+                            value={orderForm.customerName}
+                            onChange={(e) => setOrderForm({ ...orderForm, customerName: e.target.value })}
+                            required
+                            placeholder={lang === "ar" ? "اكتب اسمك ثلاثي" : "Enter your full name"}
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-semibold">{t("customerPhone")} (مصر) *</Label>
+                          <Input
+                            value={orderForm.customerPhone}
+                            onChange={(e) => setOrderForm({ ...orderForm, customerPhone: e.target.value })}
+                            required
+                            placeholder="01xxxxxxxxx"
+                            type="tel"
+                          />
+                          <p className="text-[11px] text-muted-foreground">
+                            {lang === "ar" ? "يرجى كتابة رقم هاتف مصري متاح عليه واتساب لتأكيد الشحن." : "Egyptian mobile number reachable via WhatsApp for confirmation."}
+                          </p>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-semibold">{lang === "ar" ? "البريد الإلكتروني لتحديثات الطلب" : "Email for order updates"} *</Label>
+                          <Input
+                            value={orderForm.customerEmail}
+                            onChange={(e) => {
+                              setOrderForm({ ...orderForm, customerEmail: e.target.value });
+                              if (emailError) setEmailError("");
+                            }}
+                            onInvalid={(event) => {
+                              event.preventDefault();
+                              setEmailError(lang === "ar" ? "يرجى إدخال بريد إلكتروني صحيح لتلقي تحديثات الطلب." : "Please enter a valid email address for order updates.");
+                            }}
+                            required
+                            type="email"
+                            autoComplete="email"
+                            placeholder="name@example.com"
+                            aria-invalid={Boolean(emailError)}
+                            aria-describedby="customer-email-help"
+                            className={emailError ? "border-destructive focus-visible:ring-destructive" : undefined}
+                          />
+                          <p id="customer-email-help" role={emailError ? "alert" : undefined} className={`text-[11px] ${emailError ? "font-medium text-destructive" : "text-muted-foreground"}`}>
+                            {emailError || (lang === "ar" ? "سنرسل إشعار تأكيد وتتبع الشحنة إلى هذا البريد." : "We'll send order tracking & invoice to this email.")}
+                          </p>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-semibold">{t("customerAddress")} *</Label>
+                          <Input
+                            value={orderForm.customerAddress}
+                            onChange={(e) => setOrderForm({ ...orderForm, customerAddress: e.target.value })}
+                            required
+                            placeholder={lang === "ar" ? "المحافظة - المدينة - الشارع - رقم العقار" : "Governorate - City - Street - Building No."}
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-semibold">{t("orderMessage")} ({lang === "ar" ? "اختياري" : "optional"})</Label>
+                          <Textarea
+                            value={orderForm.message}
+                            onChange={(e) => setOrderForm({ ...orderForm, message: e.target.value })}
+                            placeholder={lang === "ar" ? "أي ملاحظات خاصة بالتوصيل أو التوقيت المناسب" : "Any extra delivery notes or preferred time"}
+                            rows={2}
+                          />
+                        </div>
                       </div>
-                      <div className="space-y-2">
-                        <Label>{lang === "ar" ? "البريد الإلكتروني لتحديثات الطلب" : "Email for order updates"} *</Label>
-                        <Input
-                          value={orderForm.customerEmail}
-                          onChange={(e) => {
-                            setOrderForm({ ...orderForm, customerEmail: e.target.value });
-                            if (emailError) setEmailError("");
-                          }}
-                          onInvalid={(event) => {
-                            event.preventDefault();
-                            setEmailError(lang === "ar" ? "يرجى إدخال بريد إلكتروني صحيح لتلقي تحديثات الطلب." : "Please enter a valid email address for order updates.");
-                          }}
-                          required
-                          type="email"
-                          autoComplete="email"
-                          placeholder="name@example.com"
-                          aria-invalid={Boolean(emailError)}
-                          aria-describedby="customer-email-help"
-                          className={emailError ? "border-destructive focus-visible:ring-destructive" : undefined}
-                        />
-                        <p id="customer-email-help" role={emailError ? "alert" : undefined} className={`text-xs ${emailError ? "font-medium text-destructive" : "text-muted-foreground"}`}>{emailError || (lang === "ar" ? "سنرسل تحديثات حالة الطلب والفاتورة إلى هذا البريد." : "We will send order-status updates and your invoice to this address.")}</p>
-                      </div>
-                      <div className="space-y-2">
-                        <Label>{t("customerAddress")}</Label>
-                        <Input
-                          value={orderForm.customerAddress}
-                          onChange={(e) => setOrderForm({ ...orderForm, customerAddress: e.target.value })}
-                          placeholder={lang === "ar" ? "المحافظة - المدينة - المنطقة" : "Governorate - City - Area"}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>{t("orderMessage")} ({lang === "ar" ? "اختياري" : "optional"})</Label>
-                        <Textarea
-                          value={orderForm.message}
-                          onChange={(e) => setOrderForm({ ...orderForm, message: e.target.value })}
-                          placeholder={lang === "ar" ? "اكتب أي ملاحظة إضافية للطلب" : "Add any extra note for your order"}
-                          rows={3}
-                        />
-                      </div>
-                      <div className="bg-muted p-3 rounded-lg space-y-1">
-                        <p className="text-sm font-medium">{t("orderProduct")}: {displayName}</p>
-                        {selectedSize ? <p className="text-sm text-[#514c42]">{lang === "ar" ? "المقاس المختار" : "Selected size"}: <strong>{selectedSize}</strong></p> : null}
-                        {selectedColor ? <p className="text-sm text-[#514c42]">{lang === "ar" ? "اللون المختار" : "Selected colour"}: <strong>{selectedColor}</strong></p> : null}
-                        {isPerMeter ? <p className="text-sm text-amber-600 font-bold">{formatPrice(pricePerMeterValue)} {currency} {lang === "ar" ? "/ متر" : "/ meter"}{lang === "ar" ? " — السعر النهائي حسب القياسات" : " — final price based on measurements"}</p> : <p className="text-sm text-amber-600 font-bold">{formatPrice(sizePriceValue)} {currency}</p>}
-                        {couponState.valid && couponDiscount > 0 && (
-                          <div className="flex justify-between text-sm">
-                            <span className="text-green-600 font-medium">{couponState.message}</span>
-                            <span className="text-green-600 font-medium">- {couponDiscount} {currency}</span>
+
+                      {/* Payment Methods */}
+                      <div className="space-y-2 pt-1 border-t">
+                        <Label className="text-xs font-bold text-[#24211d]">{lang === "ar" ? "طريقة الدفع المفضلة" : "Preferred Payment Method"}</Label>
+                        <div className="grid gap-2">
+                          <label className={`flex items-center gap-3 p-2.5 rounded-xl border-2 cursor-pointer transition-all text-xs sm:text-sm ${directPaymentMethod === "cod" ? "border-[#d5af58] bg-[#faf8f5]" : "border-border/50 hover:border-border"}`}>
+                            <input type="radio" name="directPayment" value="cod" checked={directPaymentMethod === "cod"} onChange={() => setDirectPaymentMethod("cod")} className="accent-[#d5af58]" />
+                            <span className="text-lg">💵</span>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-[#24211d]">{lang === "ar" ? "كاش عند الاستلام" : "Cash on Delivery"}</p>
+                              <p className="text-[11px] text-muted-foreground">{lang === "ar" ? "ادفع نقدًا للمندوب عند استلام المنتج ومعاينته" : "Pay cash upon delivery after inspection"}</p>
+                            </div>
+                          </label>
+
+                          <label className={`flex items-center gap-3 p-2.5 rounded-xl border-2 cursor-pointer transition-all text-xs sm:text-sm ${directPaymentMethod === "instapay" ? "border-[#d5af58] bg-[#faf8f5]" : "border-border/50 hover:border-border"}`}>
+                            <input type="radio" name="directPayment" value="instapay" checked={directPaymentMethod === "instapay"} onChange={() => setDirectPaymentMethod("instapay")} className="accent-[#d5af58]" />
+                            <span className="text-lg">🏦</span>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-[#24211d]">{lang === "ar" ? "إنستاباي (InstaPay)" : "InstaPay"}</p>
+                              <p className="text-[11px] text-muted-foreground">{lang === "ar" ? "تحويل لحظي على رقم: 01121748885" : "Instant transfer to: 01121748885"}</p>
+                            </div>
+                          </label>
+
+                          <label className={`flex items-center gap-3 p-2.5 rounded-xl border-2 cursor-pointer transition-all text-xs sm:text-sm ${directPaymentMethod === "wallet" ? "border-[#d5af58] bg-[#faf8f5]" : "border-border/50 hover:border-border"}`}>
+                            <input type="radio" name="directPayment" value="wallet" checked={directPaymentMethod === "wallet"} onChange={() => setDirectPaymentMethod("wallet")} className="accent-[#d5af58]" />
+                            <span className="text-lg">📱</span>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-[#24211d]">{lang === "ar" ? "محفظة إلكترونية (فودافون كاش / أورانج / اتصالات / وي كاش)" : "E-Wallet (Vodafone/Orange/Etisalat/We)"}</p>
+                              <p className="text-[11px] text-muted-foreground">{lang === "ar" ? "تحويل محفظة على رقم: 01121748885" : "Wallet transfer to: 01121748885"}</p>
+                            </div>
+                          </label>
+                        </div>
+
+                        {(directPaymentMethod === "instapay" || directPaymentMethod === "wallet") && (
+                          <div className="p-3 rounded-xl bg-amber-50/80 border border-amber-200/80 text-xs space-y-1">
+                            <p className="font-bold text-[#8b6821] flex items-center gap-1.5">
+                              <span>📌</span> {lang === "ar" ? "تعليمات التحويل والتأكيد:" : "Transfer Instructions:"}
+                            </p>
+                            <p className="text-[#6b5a2e] leading-relaxed">
+                              {lang === "ar"
+                                ? `1. حوّل المبلغ الإجمالي (${formatPrice(Math.max(0, finalTotal * directQuantity))} ${currency}) على رقم 01121748885\n2. أرسل صورة إيصال التحويل على واتساب نفس الرقم\n3. سيتم تأكيد طلبك والبدء في التجهيز فور التحقق.`
+                                : `1. Transfer total amount (${formatPrice(Math.max(0, finalTotal * directQuantity))} ${currency}) to 01121748885\n2. Send receipt screenshot via WhatsApp to the same number\n3. Order confirmed immediately after verification.`}
+                            </p>
                           </div>
                         )}
-                        <p className="text-sm font-bold text-primary pt-1 border-t">{t("orderTotal")}: {formatPrice(finalTotal)} {currency}</p>
                       </div>
-                      <Button
-                        type="submit"
-                        className="w-full bg-[#26231e] text-white hover:bg-[#ad842f]"
-                        disabled={createOrder.isPending}
-                      >
-                        {createOrder.isPending ? (
-                          <>
-                            <Loader2 className="ms-0 me-2 h-4 w-4 animate-spin" />
-                            {t("sending")}
-                          </>
-                        ) : (
-                          t("submitOrder")
-                        )}
-                      </Button>
+
+                      {/* Guarantees & Peace of Mind */}
+                      <div className="grid grid-cols-3 gap-2 p-2.5 rounded-xl bg-[#faf8f5] border border-[#e8dfcf] text-center text-[11px]">
+                        <div className="flex flex-col items-center gap-1">
+                          <RotateCcw className="w-4 h-4 text-[#ad842f]" />
+                          <span className="font-bold text-[#24211d]">{lang === "ar" ? "إرجاع 14 يوم" : "14-Day Returns"}</span>
+                          <span className="text-[10px] text-muted-foreground">{lang === "ar" ? "استبدال واسترجاع" : "Easy exchange"}</span>
+                        </div>
+                        <div className="flex flex-col items-center gap-1 border-x border-[#e8dfcf]">
+                          <Truck className="w-4 h-4 text-[#ad842f]" />
+                          <span className="font-bold text-[#24211d]">{lang === "ar" ? "معاينة قبل الدفع" : "Inspect First"}</span>
+                          <span className="text-[10px] text-muted-foreground">{lang === "ar" ? "افحص قبل الاستلام" : "Check before paying"}</span>
+                        </div>
+                        <div className="flex flex-col items-center gap-1">
+                          <ShieldCheck className="w-4 h-4 text-[#ad842f]" />
+                          <span className="font-bold text-[#24211d]">{lang === "ar" ? "استيل 304 أصلي" : "304 Steel"}</span>
+                          <span className="text-[10px] text-muted-foreground">{lang === "ar" ? "ضمان مقاومة الصدأ" : "Rust-resistant"}</span>
+                        </div>
+                      </div>
+
+                      {/* Action buttons */}
+                      <div className="space-y-2 pt-1">
+                        <Button
+                          type="submit"
+                          className="w-full h-12 text-sm font-black bg-gradient-to-r from-[#ad842f] to-[#c9a24a] hover:from-[#96702a] hover:to-[#b5913f] text-white shadow-md transition"
+                          disabled={createOrder.isPending}
+                        >
+                          {createOrder.isPending ? (
+                            <>
+                              <Loader2 className="ms-0 me-2 h-4 w-4 animate-spin" />
+                              {lang === "ar" ? "جاري تسجيل الطلب..." : "Placing Order..."}
+                            </>
+                          ) : (
+                            lang === "ar"
+                              ? `تأكيد الطلب الآن (${formatPrice(Math.max(0, finalTotal * directQuantity))} ${currency})`
+                              : `Confirm Order Now (${formatPrice(Math.max(0, finalTotal * directQuantity))} ${currency})`
+                          )}
+                        </Button>
+
+                        <p className="text-center text-[11px] text-muted-foreground leading-tight">
+                          {lang === "ar"
+                            ? "بتأكيد الطلب أنت توافق على تواصل فريقنا معك لتأكيد التفاصيل وموعد التوصيل. لا يتم دفع أي مبالغ إجبارية حتى تأكيد الطلب."
+                            : "By placing this order, you agree our team will contact you to confirm details and delivery schedule. No mandatory payment upfront."}
+                        </p>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOrderOpen(false);
+                            handleWhatsApp();
+                          }}
+                          className="w-full flex items-center justify-center gap-2 py-2.5 text-xs font-bold text-[#25d366] hover:bg-emerald-50 rounded-xl border border-emerald-200 transition"
+                        >
+                          <MessageCircle className="w-4 h-4" />
+                          {lang === "ar" ? "أو اطلب عبر واتساب مباشرة بنقرة واحدة" : "Or order directly via WhatsApp"}
+                        </button>
+                      </div>
                     </form>
                   </DialogContent>
                 </Dialog>

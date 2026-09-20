@@ -151,12 +151,21 @@ export default function CheckoutPage() {
       toast.error(lang === "ar" ? "السلة فارغة أو المنتجات لم تعد متاحة" : "Your cart is empty or the products are no longer available");
       return;
     }
+    const paymentLabel = paymentMethod === "instapay"
+      ? (lang === "ar" ? "إنستاباي (01121748885)" : "InstaPay (01121748885)")
+      : paymentMethod === "wallet"
+      ? (lang === "ar" ? "محفظة إلكترونية (01121748885)" : "E-Wallet (01121748885)")
+      : (lang === "ar" ? "كاش عند الاستلام" : "Cash on Delivery");
+
     createCartOrder.mutate({
       customerName: form.customerName.trim(),
       customerPhone: form.customerPhone.trim(),
       customerEmail: form.customerEmail.trim() || undefined,
       customerAddress: form.customerAddress.trim() || undefined,
-      message: form.message.trim() || undefined,
+      message: [
+        form.message.trim(),
+        `${lang === "ar" ? "طريقة الدفع" : "Payment Method"}: ${paymentLabel}`,
+      ].filter(Boolean).join(" | ").trim() || undefined,
       items: availableItems.map((i) => ({
         productId: i.productId,
         selectedSize: i.selectedSize,
