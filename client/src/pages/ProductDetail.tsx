@@ -1076,7 +1076,7 @@ export default function ProductDetail() {
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {related.map((p) => {
-                const img = getPrimaryProductImage(p);
+                const img = getPrimaryProductImage(p.images);
                 const pName = lang === "ar" ? p.nameAr : p.name;
                 const pPrice = Number(p.price) || 0;
                 return (
