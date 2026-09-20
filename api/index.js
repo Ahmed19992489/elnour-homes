@@ -543,7 +543,12 @@ init_env();
 var _db = null;
 function getDb() {
   if (!_db) {
-    const url = process.env.DATABASE_URL || "postgresql://neondb_owner:npg_VM4tSBwN5PGd@ep-plain-rice-auzortld-pooler.c-10.us-east-1.aws.neon.tech/neondb?sslmode=require";
+    const url = process.env.DATABASE_URL || ENV.databaseUrl;
+    if (!url) {
+      console.warn("[Database] DATABASE_URL environment variable is not set");
+      _db = null;
+      return null;
+    }
     try {
       const client = neon(url);
       _db = drizzle(client);

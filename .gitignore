@@ -9,4 +9,6 @@ uploads/*
 .vercel
 elnour-steel-extracted
 elnour-steel.zip
-
+*.cjs
+scratch_*
+check_db.*
