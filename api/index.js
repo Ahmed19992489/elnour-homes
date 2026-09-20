@@ -1087,7 +1087,25 @@ async function getReferralUsageCount(referralCode) {
 }
 async function getOrderReport() {
   const db = getDb();
-  if (!db) return { revenueByMonth: [], topProducts: [], sourceStats: [], totals: { totalOrders: 0, totalRevenue: 0, cancelledRevenue: 0 } };
+  if (!db) {
+    return {
+      revenueByMonth: [],
+      topProducts: [],
+      sourceStats: [],
+      totals: {
+        totalOrders: 0,
+        totalRevenue: 0,
+        deliveredRevenue: 0,
+        pendingRevenue: 0,
+        cancelledRevenue: 0,
+        grossSales: 0,
+        deliveredOrders: 0,
+        pendingOrders: 0,
+        cancelledOrders: 0,
+        uniqueCustomers: 0
+      }
+    };
+  }
   const all = await db.select({
     id: orders.id,
     orderValue: orders.totalAfterDiscount,
@@ -1101,7 +1119,23 @@ async function getOrderReport() {
     createdAt: orders.createdAt
   }).from(orders);
   const customerKeys = /* @__PURE__ */ new Set();
-  const totals = { totalOrders: all.length, totalRevenue: 0, cancelledRevenue: 0, uniqueCustomers: 0 };
+  const totals = {
+    totalOrders: all.length,
+    totalRevenue: 0,
+    // الإيراد الفعلي المحصل (تم التسليم ودخل الخزينة)
+    deliveredRevenue: 0,
+    // تم التسليم ودخل الخزينة
+    pendingRevenue: 0,
+    // مبيعات قيد التحصيل (جديد، تواصل، تأكيد، شحن)
+    cancelledRevenue: 0,
+    // ملغي
+    grossSales: 0,
+    // إجمالي قيمة المبيعات
+    deliveredOrders: 0,
+    pendingOrders: 0,
+    cancelledOrders: 0,
+    uniqueCustomers: 0
+  };
   const revenueByMonth = [];
   const topMap = /* @__PURE__ */ new Map();
   const sourceMap = /* @__PURE__ */ new Map();
@@ -1112,25 +1146,58 @@ async function getOrderReport() {
     const rawVal = o.orderValue || o.productPrice || "0";
     const cleanNum = String(rawVal).replace(/[^0-9.]/g, "");
     const value = parseFloat(cleanNum) || 0;
-    if (o.status === "cancelled") {
+    const isDelivered = o.status === "delivered";
+    const isCancelled = o.status === "cancelled";
+    if (isCancelled) {
+      totals.cancelledOrders += 1;
       totals.cancelledRevenue += value;
       continue;
     }
-    totals.totalRevenue += value;
+    if (isDelivered) {
+      totals.deliveredOrders += 1;
+      totals.deliveredRevenue += value;
+      totals.totalRevenue += value;
+    } else {
+      totals.pendingOrders += 1;
+      totals.pendingRevenue += value;
+    }
+    totals.grossSales += value;
     const monthKey = o.createdAt ? `${o.createdAt.getFullYear()}-${String(o.createdAt.getMonth() + 1).padStart(2, "0")}` : "unknown";
-    const m = monthMap.get(monthKey) ?? { revenue: 0, orders: 0 };
-    m.revenue += value;
+    const m = monthMap.get(monthKey) ?? { revenue: 0, pendingRevenue: 0, orders: 0 };
+    if (isDelivered) {
+      m.revenue += value;
+    } else {
+      m.pendingRevenue += value;
+    }
     m.orders += 1;
     monthMap.set(monthKey, m);
     const pid = o.productId ?? -1;
-    const t2 = topMap.get(pid) ?? { id: pid, name: o.productName ?? "Unknown", count: 0, revenue: 0 };
+    const t2 = topMap.get(pid) ?? {
+      id: pid,
+      name: o.productName ?? "Unknown",
+      count: 0,
+      deliveredCount: 0,
+      revenue: 0,
+      pendingRevenue: 0,
+      totalValue: 0
+    };
     t2.count += 1;
-    t2.revenue += value;
+    t2.totalValue += value;
+    if (isDelivered) {
+      t2.deliveredCount += 1;
+      t2.revenue += value;
+    } else {
+      t2.pendingRevenue += value;
+    }
     topMap.set(pid, t2);
     const src = o.utmSource || "direct";
-    const s = sourceMap.get(src) ?? { source: src, orders: 0, revenue: 0 };
+    const s = sourceMap.get(src) ?? { source: src, orders: 0, revenue: 0, pendingRevenue: 0 };
     s.orders += 1;
-    s.revenue += value;
+    if (isDelivered) {
+      s.revenue += value;
+    } else {
+      s.pendingRevenue += value;
+    }
     sourceMap.set(src, s);
   }
   const monthNames = {
@@ -1149,7 +1216,12 @@ async function getOrderReport() {
   };
   Array.from(monthMap.entries()).sort(([a], [b]) => a.localeCompare(b)).forEach(([key, v]) => {
     const [y, m] = key.split("-");
-    revenueByMonth.push({ month: monthNames[m] ? `${monthNames[m]} ${y}` : key, revenue: Math.round(v.revenue), orders: v.orders });
+    revenueByMonth.push({
+      month: monthNames[m] ? `${monthNames[m]} ${y}` : key,
+      revenue: Math.round(v.revenue),
+      pendingRevenue: Math.round(v.pendingRevenue),
+      orders: v.orders
+    });
   });
   const topProducts = Array.from(topMap.values()).sort((a, b) => b.count - a.count).slice(0, 10);
   const sourceStats = Array.from(sourceMap.values()).sort((a, b) => b.orders - a.orders);

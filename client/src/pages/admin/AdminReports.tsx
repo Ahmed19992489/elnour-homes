@@ -16,6 +16,10 @@ import {
   Users,
   ShoppingCart,
   CheckCheck,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  Banknote,
 } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
@@ -110,11 +114,28 @@ export default function AdminReports() {
     }
   };
 
-  const totals = report?.totals;
-  const totalRevenue = (totals as { totalOrders?: number; totalRevenue?: number; cancelledRevenue?: number; uniqueCustomers?: number } | undefined)?.totalRevenue ?? 0;
-  const totalOrders = (totals as { totalOrders?: number; totalRevenue?: number; cancelledRevenue?: number; uniqueCustomers?: number } | undefined)?.totalOrders ?? 0;
-  const totalCustomers = (totals as { totalOrders?: number; totalRevenue?: number; cancelledRevenue?: number; uniqueCustomers?: number } | undefined)?.uniqueCustomers ?? 0;
-  const cancelledRevenue = (totals as { totalOrders?: number; totalRevenue?: number; cancelledRevenue?: number; uniqueCustomers?: number } | undefined)?.cancelledRevenue ?? 0;
+  const totals = report?.totals as {
+    totalOrders?: number;
+    totalRevenue?: number;
+    deliveredRevenue?: number;
+    pendingRevenue?: number;
+    cancelledRevenue?: number;
+    grossSales?: number;
+    deliveredOrders?: number;
+    pendingOrders?: number;
+    cancelledOrders?: number;
+    uniqueCustomers?: number;
+  } | undefined;
+
+  const deliveredRevenue = totals?.deliveredRevenue ?? totals?.totalRevenue ?? 0;
+  const pendingRevenue = totals?.pendingRevenue ?? 0;
+  const grossSales = totals?.grossSales ?? 0;
+  const totalOrders = totals?.totalOrders ?? 0;
+  const deliveredOrders = totals?.deliveredOrders ?? 0;
+  const pendingOrders = totals?.pendingOrders ?? 0;
+  const cancelledOrders = totals?.cancelledOrders ?? 0;
+  const totalCustomers = totals?.uniqueCustomers ?? 0;
+  const cancelledRevenue = totals?.cancelledRevenue ?? 0;
 
   return (
     <div className="space-y-6">
@@ -122,10 +143,10 @@ export default function AdminReports() {
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <BarChart3 className="h-6 w-6 text-[#ad842f]" />
-            التقارير والإحصائيات
+            التقارير والإحصائيات المالية
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            ملخص أداء المبيعات والمنتجات الأكثر طلبًا
+            متابعة الإيرادات المحصلة بالخزينة، المبيعات قيد التحصيل، والمنتجات الأكثر طلباً
           </p>
         </div>
         <Button onClick={handleExport} disabled={exporting || isLoading} className="bg-[#16a34a] hover:bg-[#15803d] text-white">
@@ -148,11 +169,11 @@ export default function AdminReports() {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">جميع الحالات</SelectItem>
-                  <SelectItem value="pending">قيد الانتظار</SelectItem>
+                  <SelectItem value="new">طلب جديد</SelectItem>
+                  <SelectItem value="contacted">تم التواصل</SelectItem>
                   <SelectItem value="confirmed">تم التأكيد</SelectItem>
-                  <SelectItem value="preparing">قيد التجهيز</SelectItem>
                   <SelectItem value="shipped">تم الشحن</SelectItem>
-                  <SelectItem value="delivered">تم التسليم</SelectItem>
+                  <SelectItem value="delivered">تم التسليم (محصل)</SelectItem>
                   <SelectItem value="cancelled">ملغي</SelectItem>
                 </SelectContent>
               </Select>
@@ -169,46 +190,69 @@ export default function AdminReports() {
         </CardContent>
       </Card>
 
-      {/* Totals */}
+      {/* Financial Totals */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
+        {/* Card 1: الإيرادات المحصلة (تم التسليم) */}
+        <Card className="border-emerald-300 bg-gradient-to-br from-emerald-50/60 to-white shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">إجمالي الإيرادات</CardTitle>
-            <TrendingUp className="h-4 w-4 text-[#ad842f]" />
+            <CardTitle className="text-sm font-bold text-emerald-900">الإيراد المحصل الفعلي (الخزينة)</CardTitle>
+            <Banknote className="h-5 w-5 text-emerald-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-[#24211d]">{formatPrice(totalRevenue)} <span className="text-sm font-medium text-muted-foreground">ج.م</span></div>
-            <p className="text-xs text-muted-foreground mt-1">للطلبات المدفوعة المؤكدة</p>
+            <div className="text-2xl font-black text-emerald-700">
+              {formatPrice(deliveredRevenue)} <span className="text-sm font-medium text-emerald-800">ج.م</span>
+            </div>
+            <p className="mt-1 text-xs text-emerald-700 font-medium">
+              للطلبات المسلّمة للعميل بالفعل ({deliveredOrders} طلب تم تسليمه)
+            </p>
           </CardContent>
         </Card>
-        <Card>
+
+        {/* Card 2: مبيعات قيد التحصيل (مؤكدة وقيد الشحن والتوصيل) */}
+        <Card className="border-amber-300 bg-gradient-to-br from-amber-50/60 to-white shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">إجمالي الطلبات</CardTitle>
-            <ShoppingCart className="h-4 w-4 text-[#ad842f]" />
+            <CardTitle className="text-sm font-bold text-amber-900">مبيعات قيد التحصيل والتسليم</CardTitle>
+            <Clock className="h-5 w-5 text-amber-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-[#24211d]">{formatPrice(totalOrders)}</div>
-            <p className="text-xs text-muted-foreground mt-1">منذ بداية التسجيل</p>
+            <div className="text-2xl font-black text-amber-700">
+              {formatPrice(pendingRevenue)} <span className="text-sm font-medium text-amber-800">ج.م</span>
+            </div>
+            <p className="mt-1 text-xs text-amber-700 font-medium">
+              طلبات جديدة ومؤكدة وقيد الشحن ({pendingOrders} طلب جارٍ توصيله)
+            </p>
           </CardContent>
         </Card>
-        <Card>
+
+        {/* Card 3: إجمالي قيمة المبيعات والطلبات */}
+        <Card className="border-slate-200 bg-white shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">العملاء المميزون</CardTitle>
-            <Users className="h-4 w-4 text-[#ad842f]" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">إجمالي قيمة المبيعات (الكل)</CardTitle>
+            <ShoppingCart className="h-5 w-5 text-[#ad842f]" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-[#24211d]">{formatPrice(totalCustomers)}</div>
-            <p className="text-xs text-muted-foreground mt-1">عملاء بإيميلات/هواتف فريدة</p>
+            <div className="text-2xl font-bold text-[#24211d]">
+              {formatPrice(grossSales)} <span className="text-sm font-medium text-muted-foreground">ج.م</span>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              المحصلة + قيد التحصيل (إجمالي {totalOrders} طلب)
+            </p>
           </CardContent>
         </Card>
-        <Card>
+
+        {/* Card 4: الطلبات الملغاة */}
+        <Card className="border-slate-200 bg-white shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">الإيرادات الملغاة</CardTitle>
-            <CheckCheck className="h-4 w-4 text-[#ad842f]" />
+            <CardTitle className="text-sm font-medium text-muted-foreground">الطلبات الملغاة</CardTitle>
+            <XCircle className="h-5 w-5 text-destructive" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-destructive">{formatPrice(cancelledRevenue)} <span className="text-sm font-medium text-muted-foreground">ج.م</span></div>
-            <p className="text-xs text-muted-foreground mt-1">قيمة الطلبات الملغاة — غير محسوبة ضمن الإيراد</p>
+            <div className="text-2xl font-bold text-destructive">
+              {formatPrice(cancelledRevenue)} <span className="text-sm font-medium text-muted-foreground">ج.م</span>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {cancelledOrders} طلب ملغي — غير محسوبة في الخزينة
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -217,7 +261,10 @@ export default function AdminReports() {
       {report?.revenueByMonth && report.revenueByMonth.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">الإيرادات الشهرية</CardTitle>
+            <CardTitle className="text-base flex flex-wrap items-center justify-between gap-2">
+              <span>الإيرادات والمبيعات الشهرية</span>
+              <span className="text-xs font-normal text-muted-foreground">مقارنة المبالغ المحصلة في الخزينة بالمبالغ قيد التحصيل</span>
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -225,18 +272,27 @@ export default function AdminReports() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>الشهر</TableHead>
-                    <TableHead>الطلبات</TableHead>
-                    <TableHead className="text-end">الإيراد (ج.م)</TableHead>
+                    <TableHead>عدد الطلبات</TableHead>
+                    <TableHead className="text-center font-bold text-emerald-800">المحصل بالخزينة (تم التسليم)</TableHead>
+                    <TableHead className="text-center font-bold text-amber-800">قيد التحصيل والتسليم</TableHead>
+                    <TableHead className="text-end font-bold">إجمالي المبيعات</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {report.revenueByMonth.map((row) => (
-                    <TableRow key={row.month}>
-                      <TableCell className="font-medium" dir="ltr">{row.month}</TableCell>
-                      <TableCell>{formatPrice(row.orders)}</TableCell>
-                      <TableCell className="text-end font-bold text-[#ad842f]">{formatPrice(row.revenue)}</TableCell>
-                    </TableRow>
-                  ))}
+                  {report.revenueByMonth.map((row: any) => {
+                    const delivered = row.revenue || 0;
+                    const pending = row.pendingRevenue || 0;
+                    const totalMonth = delivered + pending;
+                    return (
+                      <TableRow key={row.month}>
+                        <TableCell className="font-medium" dir="ltr">{row.month}</TableCell>
+                        <TableCell>{formatPrice(row.orders)}</TableCell>
+                        <TableCell className="text-center font-bold text-emerald-700">{formatPrice(delivered)} ج.م</TableCell>
+                        <TableCell className="text-center font-bold text-amber-700">{formatPrice(pending)} ج.م</TableCell>
+                        <TableCell className="text-end font-bold text-[#ad842f]">{formatPrice(totalMonth)} ج.م</TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>
@@ -248,9 +304,11 @@ export default function AdminReports() {
       {report?.topProducts && report.topProducts.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Package className="h-4 w-4 text-[#ad842f]" />
-              المنتجات الأكثر طلبًا
+            <CardTitle className="text-base flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Package className="h-4 w-4 text-[#ad842f]" />
+                المنتجات الأكثر طلباً وتحصيلاً
+              </span>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -260,19 +318,35 @@ export default function AdminReports() {
                   <TableRow>
                     <TableHead>#</TableHead>
                     <TableHead>المنتج</TableHead>
-                    <TableHead>الطلبات</TableHead>
-                    <TableHead className="text-end">الإيراد (ج.م)</TableHead>
+                    <TableHead>إجمالي الطلبات</TableHead>
+                    <TableHead className="text-center font-bold text-emerald-800">المحصل بالخزينة (تم التسليم)</TableHead>
+                    <TableHead className="text-center font-bold text-amber-800">قيد التحصيل</TableHead>
+                    <TableHead className="text-end font-bold">إجمالي القيمة</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {report.topProducts.map((row, idx) => (
-                    <TableRow key={row.id}>
-                      <TableCell className="text-muted-foreground">{idx + 1}</TableCell>
-                      <TableCell className="font-medium">{row.name || `منتج #${row.id}`}</TableCell>
-                      <TableCell>{formatPrice(row.count)}</TableCell>
-                      <TableCell className="text-end font-bold text-[#ad842f]">{formatPrice(row.revenue)}</TableCell>
-                    </TableRow>
-                  ))}
+                  {report.topProducts.map((row: any, idx: number) => {
+                    const delivered = row.revenue || 0;
+                    const pending = row.pendingRevenue || 0;
+                    const totalVal = row.totalValue || (delivered + pending);
+                    return (
+                      <TableRow key={row.id}>
+                        <TableCell className="text-muted-foreground">{idx + 1}</TableCell>
+                        <TableCell className="font-medium">{row.name || `منتج #${row.id}`}</TableCell>
+                        <TableCell>
+                          <span>{formatPrice(row.count)}</span>
+                          {row.deliveredCount > 0 ? (
+                            <span className="ms-2 rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-semibold text-emerald-800">
+                              {row.deliveredCount} مسلّم
+                            </span>
+                          ) : null}
+                        </TableCell>
+                        <TableCell className="text-center font-bold text-emerald-700">{formatPrice(delivered)} ج.م</TableCell>
+                        <TableCell className="text-center font-bold text-amber-700">{formatPrice(pending)} ج.م</TableCell>
+                        <TableCell className="text-end font-bold text-[#ad842f]">{formatPrice(totalVal)} ج.م</TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>

@@ -752,7 +752,25 @@ export async function getReferralUsageCount(referralCode: string) {
 
 export async function getOrderReport() {
   const db = getDb();
-  if (!db) return { revenueByMonth: [], topProducts: [], sourceStats: [], totals: { totalOrders: 0, totalRevenue: 0, cancelledRevenue: 0 } };
+  if (!db) {
+    return {
+      revenueByMonth: [],
+      topProducts: [],
+      sourceStats: [],
+      totals: {
+        totalOrders: 0,
+        totalRevenue: 0,
+        deliveredRevenue: 0,
+        pendingRevenue: 0,
+        cancelledRevenue: 0,
+        grossSales: 0,
+        deliveredOrders: 0,
+        pendingOrders: 0,
+        cancelledOrders: 0,
+        uniqueCustomers: 0,
+      },
+    };
+  }
 
   const all = await db
     .select({
@@ -770,33 +788,106 @@ export async function getOrderReport() {
     .from(orders);
 
   const customerKeys = new Set<string>();
-  const totals = { totalOrders: all.length, totalRevenue: 0, cancelledRevenue: 0, uniqueCustomers: 0 };
-  const revenueByMonth: { month: string; revenue: number; orders: number }[] = [];
-  const topMap = new Map<number, { id: number; name: string; count: number; revenue: number }>();
-  const sourceMap = new Map<string, { source: string; orders: number; revenue: number }>();
-  const monthMap = new Map<string, { revenue: number; orders: number }>();
+  const totals = {
+    totalOrders: all.length,
+    totalRevenue: 0,       // الإيراد الفعلي المحصل (تم التسليم ودخل الخزينة)
+    deliveredRevenue: 0,   // تم التسليم ودخل الخزينة
+    pendingRevenue: 0,     // مبيعات قيد التحصيل (جديد، تواصل، تأكيد، شحن)
+    cancelledRevenue: 0,   // ملغي
+    grossSales: 0,         // إجمالي قيمة المبيعات
+    deliveredOrders: 0,
+    pendingOrders: 0,
+    cancelledOrders: 0,
+    uniqueCustomers: 0,
+  };
+
+  const revenueByMonth: {
+    month: string;
+    revenue: number;        // محصل (تم التسليم)
+    pendingRevenue: number; // قيد التحصيل
+    orders: number;
+  }[] = [];
+
+  const topMap = new Map<number, {
+    id: number;
+    name: string;
+    count: number;
+    deliveredCount: number;
+    revenue: number;        // محصل
+    pendingRevenue: number; // قيد التحصيل
+    totalValue: number;
+  }>();
+
+  const sourceMap = new Map<string, { source: string; orders: number; revenue: number; pendingRevenue: number }>();
+  const monthMap = new Map<string, { revenue: number; pendingRevenue: number; orders: number }>();
 
   for (const o of all) {
     const key = [o.customerEmail || "", o.customerPhone || ""].filter(Boolean).join("|");
     if (key) customerKeys.add(key);
+
     const rawVal = o.orderValue || o.productPrice || "0";
     const cleanNum = String(rawVal).replace(/[^0-9.]/g, "");
     const value = parseFloat(cleanNum) || 0;
-    if (o.status === "cancelled") { totals.cancelledRevenue += value; continue; }
-    totals.totalRevenue += value;
+
+    const isDelivered = o.status === "delivered";
+    const isCancelled = o.status === "cancelled";
+
+    if (isCancelled) {
+      totals.cancelledOrders += 1;
+      totals.cancelledRevenue += value;
+      continue;
+    }
+
+    if (isDelivered) {
+      totals.deliveredOrders += 1;
+      totals.deliveredRevenue += value;
+      totals.totalRevenue += value; // Realized cash in hand
+    } else {
+      totals.pendingOrders += 1;
+      totals.pendingRevenue += value;
+    }
+    totals.grossSales += value;
+
     const monthKey = o.createdAt
       ? `${o.createdAt.getFullYear()}-${String(o.createdAt.getMonth() + 1).padStart(2, "0")}`
       : "unknown";
-    const m = monthMap.get(monthKey) ?? { revenue: 0, orders: 0 };
-    m.revenue += value; m.orders += 1;
+    const m = monthMap.get(monthKey) ?? { revenue: 0, pendingRevenue: 0, orders: 0 };
+    if (isDelivered) {
+      m.revenue += value;
+    } else {
+      m.pendingRevenue += value;
+    }
+    m.orders += 1;
     monthMap.set(monthKey, m);
+
     const pid = o.productId ?? -1;
-    const t = topMap.get(pid) ?? { id: pid, name: o.productName ?? "Unknown", count: 0, revenue: 0 };
-    t.count += 1; t.revenue += value;
+    const t = topMap.get(pid) ?? {
+      id: pid,
+      name: o.productName ?? "Unknown",
+      count: 0,
+      deliveredCount: 0,
+      revenue: 0,
+      pendingRevenue: 0,
+      totalValue: 0,
+    };
+    t.count += 1;
+    t.totalValue += value;
+    if (isDelivered) {
+      t.deliveredCount += 1;
+      t.revenue += value;
+    } else {
+      t.pendingRevenue += value;
+    }
     topMap.set(pid, t);
+
     const src = o.utmSource || "direct";
-    const s = sourceMap.get(src) ?? { source: src, orders: 0, revenue: 0 };
-    s.orders += 1; s.revenue += value;
+    const s = sourceMap.get(src) ?? { source: src, orders: 0, revenue: 0, pendingRevenue: 0 };
+    s.orders += 1;
+    if (isDelivered) {
+      s.revenue += value;
+    } else {
+      s.pendingRevenue += value;
+    }
     sourceMap.set(src, s);
   }
 
@@ -806,7 +897,12 @@ export async function getOrderReport() {
   };
   Array.from(monthMap.entries()).sort(([a], [b]) => a.localeCompare(b)).forEach(([key, v]) => {
     const [y, m] = key.split("-");
-    revenueByMonth.push({ month: monthNames[m] ? `${monthNames[m]} ${y}` : key, revenue: Math.round(v.revenue), orders: v.orders });
+    revenueByMonth.push({
+      month: monthNames[m] ? `${monthNames[m]} ${y}` : key,
+      revenue: Math.round(v.revenue),
+      pendingRevenue: Math.round(v.pendingRevenue),
+      orders: v.orders,
+    });
   });
 
   const topProducts = Array.from(topMap.values()).sort((a, b) => b.count - a.count).slice(0, 10);
