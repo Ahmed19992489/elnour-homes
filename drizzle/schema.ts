@@ -277,3 +277,15 @@ export const contactInbox = pgTable("contact_inbox", {
 
 export type ContactMessage = typeof contactInbox.$inferSelect;
 export type InsertContactMessage = typeof contactInbox.$inferInsert;
+
+export const uploadedMedia = pgTable("uploaded_media", {
+  id: serial("id").primaryKey(),
+  filename: varchar("filename", { length: 255 }).notNull(),
+  contentType: varchar("content_type", { length: 100 }).default("image/jpeg").notNull(),
+  data: text("data").notNull(),
+  sizeBytes: integer("size_bytes").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type UploadedMedia = typeof uploadedMedia.$inferSelect;
+export type InsertUploadedMedia = typeof uploadedMedia.$inferInsert;

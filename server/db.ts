@@ -20,6 +20,7 @@ import {
   siteSettings,
   restockAlerts,
   contactInbox,
+  uploadedMedia,
 } from "../drizzle/schema";
 import type {
   InsertProduct,
@@ -33,6 +34,7 @@ import type {
   InsertAdminCredential,
   InsertAdminSession,
   InsertSiteSetting,
+  InsertUploadedMedia,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -973,4 +975,61 @@ export async function deleteContactMessage(id: number) {
   const db = getDb();
   if (!db) throw new Error("Database not available");
   await db.delete(contactInbox).where(eq(contactInbox.id, id));
+}
+
+// ===== UPLOADED MEDIA (PERSISTENT IN-DATABASE STORAGE) =====
+
+let _uploadedMediaTableReady = false;
+export async function ensureUploadedMediaTable(): Promise<void> {
+  if (_uploadedMediaTableReady) return;
+  const url = process.env.DATABASE_URL || ENV.databaseUrl;
+  if (!url) return;
+  try {
+    const rawSql = neon(url);
+    await rawSql`
+      CREATE TABLE IF NOT EXISTS uploaded_media (
+        id SERIAL PRIMARY KEY,
+        filename VARCHAR(255) NOT NULL,
+        content_type VARCHAR(100) DEFAULT 'image/jpeg' NOT NULL,
+        data TEXT NOT NULL,
+        size_bytes INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+    `;
+    _uploadedMediaTableReady = true;
+  } catch (err) {
+    console.error("[Database] Error ensuring uploaded_media table:", err);
+  }
+}
+
+export async function saveUploadedMedia(media: {
+  filename: string;
+  contentType: string;
+  data: string;
+  sizeBytes?: number;
+}) {
+  await ensureUploadedMediaTable();
+  const url = process.env.DATABASE_URL || ENV.databaseUrl;
+  if (!url) throw new Error("DATABASE_URL is not set");
+  const rawSql = neon(url);
+  const rows = await rawSql`
+    INSERT INTO uploaded_media (filename, content_type, data, size_bytes)
+    VALUES (${media.filename}, ${media.contentType || 'image/jpeg'}, ${media.data}, ${media.sizeBytes || 0})
+    RETURNING id, filename
+  `;
+  return rows[0] as { id: number; filename: string };
+}
+
+export async function getUploadedMediaById(id: number) {
+  await ensureUploadedMediaTable();
+  const url = process.env.DATABASE_URL || ENV.databaseUrl;
+  if (!url) return null;
+  const rawSql = neon(url);
+  const rows = await rawSql`
+    SELECT id, filename, content_type as "contentType", data, size_bytes as "sizeBytes", created_at as "createdAt"
+    FROM uploaded_media
+    WHERE id = ${id}
+    LIMIT 1
+  `;
+  return rows[0] as { id: number; filename: string; contentType: string; data: string } | undefined;
 }

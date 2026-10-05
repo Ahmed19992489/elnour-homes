@@ -1041,13 +1041,19 @@ export const appRouter = router({
         contentType: z.string().default("image/jpeg"),
       }))
       .mutation(async ({ input }) => {
-        const { storagePut } = await import("./storage");
-        const key = `uploads/${Date.now()}_${input.filename}`;
-        // Decode base64 to bytes
         const base64Data = input.base64.replace(/^data:[^;]+;base64,/, '');
         const buffer = Buffer.from(base64Data, 'base64');
-        const result = await storagePut(key, buffer, input.contentType);
-        return { key: result.key, url: result.url };
+        const sizeBytes = buffer.length;
+
+        const media = await db.saveUploadedMedia({
+          filename: input.filename,
+          contentType: input.contentType,
+          data: input.base64,
+          sizeBytes,
+        });
+
+        const url = `/api/uploads/${media.id}`;
+        return { key: String(media.id), url };
       }),
   }),
 

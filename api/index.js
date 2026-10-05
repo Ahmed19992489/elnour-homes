@@ -1,106 +1,3 @@
-var __defProp = Object.defineProperty;
-var __getOwnPropNames = Object.getOwnPropertyNames;
-var __esm = (fn, res) => function __init() {
-  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
-};
-var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
-};
-
-// server/_core/env.ts
-var ENV;
-var init_env = __esm({
-  "server/_core/env.ts"() {
-    ENV = {
-      appId: process.env.VITE_APP_ID ?? "elnour-steel",
-      cookieSecret: process.env.JWT_SECRET || process.env.COOKIE_SECRET || "elnour-steel-secret-key-jwt-2026-production",
-      databaseUrl: process.env.DATABASE_URL ?? "",
-      oAuthServerUrl: process.env.OAUTH_SERVER_URL ?? "",
-      ownerOpenId: process.env.OWNER_OPEN_ID || "admin-01118182424",
-      isProduction: process.env.NODE_ENV === "production",
-      forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
-      forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? ""
-    };
-  }
-});
-
-// server/storage.ts
-var storage_exports = {};
-__export(storage_exports, {
-  storageGet: () => storageGet,
-  storageGetSignedUrl: () => storageGetSignedUrl,
-  storagePut: () => storagePut
-});
-function getForgeConfig() {
-  const forgeUrl = ENV.forgeApiUrl;
-  const forgeKey = ENV.forgeApiKey;
-  if (!forgeUrl || !forgeKey) {
-    throw new Error(
-      "Storage config missing: set BUILT_IN_FORGE_API_URL and BUILT_IN_FORGE_API_KEY"
-    );
-  }
-  return { forgeUrl: forgeUrl.replace(/\/+$/, ""), forgeKey };
-}
-function normalizeKey(relKey) {
-  return relKey.replace(/^\/+/, "");
-}
-function appendHashSuffix(relKey) {
-  const hash = crypto.randomUUID().replace(/-/g, "").slice(0, 8);
-  const lastDot = relKey.lastIndexOf(".");
-  if (lastDot === -1) return `${relKey}_${hash}`;
-  return `${relKey.slice(0, lastDot)}_${hash}${relKey.slice(lastDot)}`;
-}
-async function storagePut(relKey, data, contentType = "application/octet-stream") {
-  const { forgeUrl, forgeKey } = getForgeConfig();
-  const key = appendHashSuffix(normalizeKey(relKey));
-  const presignUrl = new URL("v1/storage/presign/put", forgeUrl + "/");
-  presignUrl.searchParams.set("path", key);
-  const presignResp = await fetch(presignUrl, {
-    headers: { Authorization: `Bearer ${forgeKey}` }
-  });
-  if (!presignResp.ok) {
-    const msg = await presignResp.text().catch(() => presignResp.statusText);
-    throw new Error(`Storage presign failed (${presignResp.status}): ${msg}`);
-  }
-  const { url: s3Url } = await presignResp.json();
-  if (!s3Url) throw new Error("Forge returned empty presign URL");
-  const blob = typeof data === "string" ? new Blob([data], { type: contentType }) : new Blob([data], { type: contentType });
-  const uploadResp = await fetch(s3Url, {
-    method: "PUT",
-    headers: { "Content-Type": contentType },
-    body: blob
-  });
-  if (!uploadResp.ok) {
-    throw new Error(`Storage upload to S3 failed (${uploadResp.status})`);
-  }
-  return { key, url: `/manus-storage/${key}` };
-}
-async function storageGet(relKey) {
-  const key = normalizeKey(relKey);
-  return { key, url: `/manus-storage/${key}` };
-}
-async function storageGetSignedUrl(relKey) {
-  const { forgeUrl, forgeKey } = getForgeConfig();
-  const key = normalizeKey(relKey);
-  const getUrl = new URL("v1/storage/presign/get", forgeUrl + "/");
-  getUrl.searchParams.set("path", key);
-  const resp = await fetch(getUrl, {
-    headers: { Authorization: `Bearer ${forgeKey}` }
-  });
-  if (!resp.ok) {
-    const msg = await resp.text().catch(() => resp.statusText);
-    throw new Error(`Storage signed URL failed (${resp.status}): ${msg}`);
-  }
-  const { url } = await resp.json();
-  return url;
-}
-var init_storage = __esm({
-  "server/storage.ts"() {
-    init_env();
-  }
-});
-
 // server/api.ts
 import "dotenv/config";
 import express from "express";
@@ -132,8 +29,17 @@ var decodeOAuthState = (state) => {
   return { redirectUri: decoded };
 };
 
-// server/routers.ts
-init_env();
+// server/_core/env.ts
+var ENV = {
+  appId: process.env.VITE_APP_ID ?? "elnour-steel",
+  cookieSecret: process.env.JWT_SECRET || process.env.COOKIE_SECRET || "elnour-steel-secret-key-jwt-2026-production",
+  databaseUrl: process.env.DATABASE_URL ?? "",
+  oAuthServerUrl: process.env.OAUTH_SERVER_URL ?? "",
+  ownerOpenId: process.env.OWNER_OPEN_ID || "admin-01118182424",
+  isProduction: process.env.NODE_ENV === "production",
+  forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
+  forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? ""
+};
 
 // server/_core/cookies.ts
 function isSecureRequest(req) {
@@ -156,7 +62,6 @@ function getSessionCookieOptions(req) {
 import { z } from "zod";
 
 // server/_core/notification.ts
-init_env();
 import { TRPCError } from "@trpc/server";
 var TITLE_MAX_LENGTH = 1200;
 var CONTENT_MAX_LENGTH = 2e4;
@@ -537,9 +442,16 @@ var contactInbox = pgTable("contact_inbox", {
   readAt: timestamp("read_at"),
   createdAt: timestamp("created_at").defaultNow().notNull()
 });
+var uploadedMedia = pgTable("uploaded_media", {
+  id: serial("id").primaryKey(),
+  filename: varchar("filename", { length: 255 }).notNull(),
+  contentType: varchar("content_type", { length: 100 }).default("image/jpeg").notNull(),
+  data: text("data").notNull(),
+  sizeBytes: integer("size_bytes").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull()
+});
 
 // server/db.ts
-init_env();
 var _db = null;
 function getDb() {
   if (!_db) {
@@ -1288,6 +1200,53 @@ async function deleteContactMessage(id) {
   const db = getDb();
   if (!db) throw new Error("Database not available");
   await db.delete(contactInbox).where(eq(contactInbox.id, id));
+}
+var _uploadedMediaTableReady = false;
+async function ensureUploadedMediaTable() {
+  if (_uploadedMediaTableReady) return;
+  const url = process.env.DATABASE_URL || ENV.databaseUrl;
+  if (!url) return;
+  try {
+    const rawSql = neon(url);
+    await rawSql`
+      CREATE TABLE IF NOT EXISTS uploaded_media (
+        id SERIAL PRIMARY KEY,
+        filename VARCHAR(255) NOT NULL,
+        content_type VARCHAR(100) DEFAULT 'image/jpeg' NOT NULL,
+        data TEXT NOT NULL,
+        size_bytes INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+      );
+    `;
+    _uploadedMediaTableReady = true;
+  } catch (err) {
+    console.error("[Database] Error ensuring uploaded_media table:", err);
+  }
+}
+async function saveUploadedMedia(media) {
+  await ensureUploadedMediaTable();
+  const url = process.env.DATABASE_URL || ENV.databaseUrl;
+  if (!url) throw new Error("DATABASE_URL is not set");
+  const rawSql = neon(url);
+  const rows = await rawSql`
+    INSERT INTO uploaded_media (filename, content_type, data, size_bytes)
+    VALUES (${media.filename}, ${media.contentType || "image/jpeg"}, ${media.data}, ${media.sizeBytes || 0})
+    RETURNING id, filename
+  `;
+  return rows[0];
+}
+async function getUploadedMediaById(id) {
+  await ensureUploadedMediaTable();
+  const url = process.env.DATABASE_URL || ENV.databaseUrl;
+  if (!url) return null;
+  const rawSql = neon(url);
+  const rows = await rawSql`
+    SELECT id, filename, content_type as "contentType", data, size_bytes as "sizeBytes", created_at as "createdAt"
+    FROM uploaded_media
+    WHERE id = ${id}
+    LIMIT 1
+  `;
+  return rows[0];
 }
 
 // server/notificationStream.ts
@@ -2339,12 +2298,17 @@ var appRouter = router({
       base64: z2.string().min(1),
       contentType: z2.string().default("image/jpeg")
     })).mutation(async ({ input }) => {
-      const { storagePut: storagePut2 } = await Promise.resolve().then(() => (init_storage(), storage_exports));
-      const key = `uploads/${Date.now()}_${input.filename}`;
       const base64Data = input.base64.replace(/^data:[^;]+;base64,/, "");
       const buffer = Buffer.from(base64Data, "base64");
-      const result = await storagePut2(key, buffer, input.contentType);
-      return { key: result.key, url: result.url };
+      const sizeBytes = buffer.length;
+      const media = await saveUploadedMedia({
+        filename: input.filename,
+        contentType: input.contentType,
+        data: input.base64,
+        sizeBytes
+      });
+      const url = `/api/uploads/${media.id}`;
+      return { key: String(media.id), url };
     })
   }),
   /**
@@ -2688,7 +2652,6 @@ var ForbiddenError = (msg) => new HttpError(403, msg);
 import axios from "axios";
 import { parse as parseCookieHeader } from "cookie";
 import { SignJWT as SignJWT2, jwtVerify } from "jose";
-init_env();
 var isNonEmptyString2 = (value) => typeof value === "string" && value.length > 0;
 var EXCHANGE_TOKEN_PATH = `/webdev.v1.WebDevAuthPublicService/ExchangeToken`;
 var GET_USER_INFO_PATH = `/webdev.v1.WebDevAuthPublicService/GetUserInfo`;
@@ -2933,7 +2896,6 @@ function buildCronUser(userInfo) {
 var sdk = new SDKServer();
 
 // server/_core/context.ts
-init_env();
 var isNonEmptyString3 = (value) => typeof value === "string" && value.length > 0;
 async function authenticateCustomerSession(cookieHeader) {
   if (!cookieHeader) return null;
@@ -3039,6 +3001,28 @@ async function createContext(opts) {
 var app = express();
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
+app.get(["/api/uploads/:id", "/uploads/:id"], async (req, res) => {
+  try {
+    const rawId = req.params.id.split(".")[0];
+    const id = parseInt(rawId, 10);
+    if (isNaN(id)) {
+      return res.status(400).send("Invalid image id");
+    }
+    const media = await getUploadedMediaById(id);
+    if (!media) {
+      return res.status(404).send("Image not found");
+    }
+    const base64Data = media.data.replace(/^data:[^;]+;base64,/, "");
+    const buffer = Buffer.from(base64Data, "base64");
+    res.setHeader("Content-Type", media.contentType || "image/jpeg");
+    res.setHeader("Cache-Control", "public, max-age=31536000, s-maxage=31536000, immutable");
+    res.setHeader("Content-Length", buffer.length);
+    return res.end(buffer);
+  } catch (err) {
+    console.error("[Media] Error serving uploaded media:", err);
+    return res.status(500).send("Server error");
+  }
+});
 app.use(
   ["/api/trpc", "/trpc"],
   createExpressMiddleware({

@@ -161,6 +161,17 @@ async function main() {
     );
   `;
 
+  await sql`
+    CREATE TABLE IF NOT EXISTS uploaded_media (
+      id SERIAL PRIMARY KEY,
+      filename VARCHAR(255) NOT NULL,
+      content_type VARCHAR(100) DEFAULT 'image/jpeg' NOT NULL,
+      data TEXT NOT NULL,
+      size_bytes INTEGER DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+    );
+  `;
+
   // Seed default products and categories if empty
   const cats = await sql`SELECT count(*) FROM categories`;
   if (parseInt(cats[0].count) === 0) {

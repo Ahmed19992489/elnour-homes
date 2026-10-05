@@ -17,6 +17,56 @@ import { SQM_PRICE_EGP } from "@shared/const";
 import { toast } from "sonner";
 import { hasProductImage, parseProductImages, serializeProductImages } from "@/lib/productImages";
 
+async function compressImageFile(file: File): Promise<{ filename: string; base64: string; contentType: string }> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("فشل قراءة الملف"));
+    reader.onload = () => {
+      const img = new window.Image();
+      img.onerror = () => reject(new Error("ملف الصورة غير صالح"));
+      img.onload = () => {
+        const MAX_DIM = 1280;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_DIM) {
+            height = Math.round((height * MAX_DIM) / width);
+            width = MAX_DIM;
+          }
+        } else {
+          if (height > MAX_DIM) {
+            width = Math.round((width * MAX_DIM) / height);
+            height = MAX_DIM;
+          }
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          return resolve({
+            filename: file.name,
+            base64: reader.result as string,
+            contentType: file.type || "image/jpeg",
+          });
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+        const base64 = canvas.toDataURL("image/jpeg", 0.82);
+        resolve({
+          filename: file.name.replace(/\.[^.]+$/, ".jpg"),
+          base64,
+          contentType: "image/jpeg",
+        });
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function AdminProducts() {
   const { user, isAuthenticated } = useAuth();
   const [open, setOpen] = useState(false);
@@ -285,44 +335,48 @@ export default function AdminProducts() {
     setSpecCare("");
   };
 
+  const [directImageUrl, setDirectImageUrl] = useState("");
+
+  const handleAddDirectUrl = () => {
+    const url = directImageUrl.trim();
+    if (!url) return;
+    const currentImages = parseProductImages(form.images);
+    const newImages = [...currentImages, url];
+    setForm({ ...form, images: serializeProductImages(newImages) });
+    setDirectImageUrl("");
+    toast.success("تمت إضافة رابط الصورة بنجاح");
+  };
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Check file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("حجم الصورة يجب أن يكون أقل من 5 ميجابايت");
-      return;
-    }
-
-    // Check file type
     if (!file.type.startsWith("image/")) {
-      toast.error("يرجى اختيار ملف صورة");
+      toast.error("يرجى اختيار ملف صورة صالح");
       return;
     }
 
     setUploading(true);
 
-    // Convert to base64
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const base64 = reader.result as string;
+    try {
+      const optimized = await compressImageFile(file);
       uploadImage.mutate({
-        filename: file.name,
-        base64,
-        contentType: file.type,
+        filename: optimized.filename,
+        base64: optimized.base64,
+        contentType: optimized.contentType,
       });
-    };
-    reader.readAsDataURL(file);
-
-    // Reset input
-    if (fileInputRef.current) fileInputRef.current.value = "";
+    } catch (err: any) {
+      setUploading(false);
+      toast.error(err?.message || "تعذر معالجة الصورة، يرجى المحاولة مرة أخرى");
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (form.isActive && !hasProductImage(form.images)) {
-      toast.error("أضف صورة واحدة على الأقل قبل نشر المنتج في المتجر");
+      toast.error("تنبيه: لتفعيل المنتج ونشره في المتجر يجب إضافة صورة واحدة على الأقل، أو يمكنك إلغاء تفعيل 'منتج نشط' لحفظ التعديلات كمسودة الآن.");
       return;
     }
     const data = {
@@ -660,9 +714,16 @@ export default function AdminProducts() {
                 </div>
 
                 {/* Image Upload */}
-                <div className="space-y-2">
-                  <Label>صور المنتج</Label>
-                  <p className="text-xs leading-5 text-muted-foreground">ارفع الصور بالترتيب الذي تريد عرضه: صورة الغلاف أولاً، ثم الواجهة والخلفية وباقي الزوايا. تظهر الصورة الأولى في الكتالوج. لا يمكن نشر منتج نشط من دون صورة واحدة على الأقل.</p>
+                <div className="space-y-2 rounded-lg border p-3 bg-muted/10">
+                  <div className="flex items-center justify-between">
+                    <Label className="font-semibold">صور المنتج</Label>
+                    <span className="text-xs text-muted-foreground">
+                      {parseProductImages(form.images).length} صورة مضافة
+                    </span>
+                  </div>
+                  <p className="text-xs leading-5 text-muted-foreground">
+                    يمكنك رفع صور مباشرة من الموبايل (الكاميرا أو المعرض) أو اللابتوب. صورة الغلاف الأولى هي التي تظهر في الكتالوج.
+                  </p>
                   <div className="space-y-3">
                     <div className="flex gap-2">
                       <Input
@@ -670,25 +731,47 @@ export default function AdminProducts() {
                         type="file"
                         accept="image/*"
                         onChange={handleFileChange}
-                        className="flex-1"
+                        disabled={uploading}
+                        className="flex-1 cursor-pointer"
                       />
                     </div>
+
+                    <div className="flex gap-2 items-center">
+                      <Input
+                        value={directImageUrl}
+                        onChange={(e) => setDirectImageUrl(e.target.value)}
+                        placeholder="أو الصق رابط صورة مباشر (https://...)"
+                        className="text-xs"
+                      />
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleAddDirectUrl}
+                        disabled={!directImageUrl.trim()}
+                        className="whitespace-nowrap text-xs"
+                      >
+                        إضافة رابط
+                      </Button>
+                    </div>
+
                     {uploading && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-2 text-sm text-amber-600 font-medium">
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        جاري رفع الصورة...
+                        جاري معالجة ورفع الصورة وحفظها بالسيرفر...
                       </div>
                     )}
                     {parseProductImages(form.images).length > 0 && (
                       <div className="grid grid-cols-3 gap-2 mt-2">
                         {parseProductImages(form.images).map((img, i) => (
-                          <div key={i} className="relative aspect-square rounded-lg overflow-hidden border">
+                          <div key={i} className="relative aspect-square rounded-lg overflow-hidden border bg-muted">
                             <img src={img} alt={`صورة ${i + 1}`} className="w-full h-full object-cover" />
-                            {i === 0 ? <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-white">الغلاف</span> : null}
+                            {i === 0 ? <span className="absolute bottom-1 left-1 rounded bg-black/75 px-1.5 py-0.5 text-[10px] font-bold text-white shadow">الغلاف</span> : null}
                             <button
                               type="button"
                               onClick={() => removeImage(i)}
-                              className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                              className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 shadow"
+                              title="حذف الصورة"
                             >
                               <X className="h-3 w-3" />
                             </button>
@@ -699,14 +782,31 @@ export default function AdminProducts() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <Label>منتج نشط</Label>
+                <div className="flex items-center justify-between rounded-lg border p-3 bg-muted/20">
+                  <div className="space-y-0.5">
+                    <Label className="text-sm font-semibold cursor-pointer" htmlFor="product-active-switch">
+                      منتج نشط في المتجر
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      {form.isActive ? (
+                        hasProductImage(form.images) ? (
+                          <span className="text-emerald-600 font-medium">✓ المنتج منشور ومتاح للشراء في المتجر</span>
+                        ) : (
+                          <span className="text-amber-600 font-medium">⚠️ يحتاج صورة واحدة على الأقل ليظهر للعملاء في الكتالوج</span>
+                        )
+                      ) : (
+                        <span>مسودة غير معروضة في المتجر (يمكنك الحفظ الآن كمسودة)</span>
+                      )}
+                    </p>
+                  </div>
                   <Switch
+                    id="product-active-switch"
                     checked={form.isActive}
                     onCheckedChange={(val) => setForm({ ...form, isActive: val })}
                   />
                 </div>
-                <Button type="submit" className="w-full" disabled={createProduct.isPending || updateProduct.isPending || (form.isActive && !hasProductImage(form.images))}>
+
+                <Button type="submit" className="w-full" disabled={createProduct.isPending || updateProduct.isPending}>
                   {(createProduct.isPending || updateProduct.isPending) ? (
                     <Loader2 className="ml-2 h-4 w-4 animate-spin" />
                   ) : (

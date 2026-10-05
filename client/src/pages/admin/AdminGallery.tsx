@@ -10,6 +10,56 @@ import { Loader2, Plus, Trash2, Image, Upload } from "lucide-react";
 import { useState, useRef } from "react";
 import { toast } from "sonner";
 
+async function compressImageFile(file: File): Promise<{ filename: string; base64: string; contentType: string }> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("فشل قراءة الملف"));
+    reader.onload = () => {
+      const img = new window.Image();
+      img.onerror = () => reject(new Error("ملف الصورة غير صالح"));
+      img.onload = () => {
+        const MAX_DIM = 1280;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_DIM) {
+            height = Math.round((height * MAX_DIM) / width);
+            width = MAX_DIM;
+          }
+        } else {
+          if (height > MAX_DIM) {
+            width = Math.round((width * MAX_DIM) / height);
+            height = MAX_DIM;
+          }
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          return resolve({
+            filename: file.name,
+            base64: reader.result as string,
+            contentType: file.type || "image/jpeg",
+          });
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+        const base64 = canvas.toDataURL("image/jpeg", 0.82);
+        resolve({
+          filename: file.name.replace(/\.[^.]+$/, ".jpg"),
+          base64,
+          contentType: "image/jpeg",
+        });
+      };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function AdminGallery() {
   const { user, isAuthenticated } = useAuth();
   const [open, setOpen] = useState(false);
@@ -58,28 +108,25 @@ export default function AdminGallery() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("حجم الصورة يجب أن يكون أقل من 5 ميجابايت");
-      return;
-    }
-
     if (!file.type.startsWith("image/")) {
-      toast.error("يرجى اختيار ملف صورة");
+      toast.error("يرجى اختيار ملف صورة صالح");
       return;
     }
 
     setUploading(true);
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const base64 = reader.result as string;
+    try {
+      const optimized = await compressImageFile(file);
       uploadImage.mutate({
-        filename: file.name,
-        base64,
-        contentType: file.type,
+        filename: optimized.filename,
+        base64: optimized.base64,
+        contentType: optimized.contentType,
       });
-    };
-    reader.readAsDataURL(file);
-    if (fileInputRef.current) fileInputRef.current.value = "";
+    } catch (err: any) {
+      setUploading(false);
+      toast.error(err?.message || "تعذر معالجة الصورة، يرجى المحاولة مرة أخرى");
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {

@@ -10,6 +10,7 @@ import { createContext } from "./context";
 import { sdk } from "./sdk";
 import { openAccountNotificationStream } from "../notificationStream";
 import { serveStatic, setupVite } from "./vite";
+import * as db from "../db";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -36,6 +37,31 @@ async function startServer() {
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
+
+  // Serve uploaded images directly from database
+  app.get(["/api/uploads/:id", "/uploads/:id"], async (req, res) => {
+    try {
+      const rawId = req.params.id.split(".")[0];
+      const id = parseInt(rawId, 10);
+      if (isNaN(id)) {
+        return res.status(400).send("Invalid image id");
+      }
+      const media = await db.getUploadedMediaById(id);
+      if (!media) {
+        return res.status(404).send("Image not found");
+      }
+      const base64Data = media.data.replace(/^data:[^;]+;base64,/, "");
+      const buffer = Buffer.from(base64Data, "base64");
+      res.setHeader("Content-Type", media.contentType || "image/jpeg");
+      res.setHeader("Cache-Control", "public, max-age=31536000, s-maxage=31536000, immutable");
+      res.setHeader("Content-Length", buffer.length);
+      return res.end(buffer);
+    } catch (err) {
+      console.error("[Media] Error serving uploaded media:", err);
+      return res.status(500).send("Server error");
+    }
+  });
+
   registerStorageProxy(app);
   registerOAuthRoutes(app);
   // tRPC API
