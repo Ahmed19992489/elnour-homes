@@ -67,6 +67,16 @@ async function compressImageFile(file: File): Promise<{ filename: string; base64
   });
 }
 
+function cleanNumber(val: any): number {
+  if (typeof val === "number") return isNaN(val) ? 0 : val;
+  if (!val) return 0;
+  const western = String(val)
+    .replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)))
+    .replace(/[,\s]/g, "");
+  const num = parseFloat(western);
+  return isNaN(num) ? 0 : num;
+}
+
 export default function AdminProducts() {
   const { user, isAuthenticated } = useAuth();
   const [open, setOpen] = useState(false);
@@ -253,23 +263,29 @@ export default function AdminProducts() {
 
   const createProduct = trpc.products.create.useMutation({
     onSuccess: () => {
-      toast.success("تم إضافة المنتج");
+      toast.success("تم إضافة المنتج بنجاح");
       setOpen(false);
       resetForm();
       utils.products.list.invalidate();
     },
-    onError: () => toast.error("حدث خطأ"),
+    onError: (err: any) => {
+      console.error("Create product error:", err);
+      toast.error(err?.message || "حدث خطأ أثناء إضافة المنتج");
+    },
   });
 
   const updateProduct = trpc.products.update.useMutation({
     onSuccess: () => {
-      toast.success("تم تحديث المنتج");
+      toast.success("تم تحديث المنتج بنجاح");
       setOpen(false);
       resetForm();
       setEditId(null);
       utils.products.list.invalidate();
     },
-    onError: () => toast.error("حدث خطأ"),
+    onError: (err: any) => {
+      console.error("Update product error:", err);
+      toast.error(err?.message || "حدث خطأ أثناء تحديث المنتج");
+    },
   });
 
   const deleteProduct = trpc.products.delete.useMutation({
@@ -314,6 +330,7 @@ export default function AdminProducts() {
   });
 
   const resetForm = () => {
+    const defaultCat = categories?.[0]?.slug || "tables";
     setForm({
       name: "",
       nameAr: "",
@@ -326,7 +343,7 @@ export default function AdminProducts() {
       colorOptions: "",
       pricingType: "fixed",
       pricePerMeter: "",
-      category: "home-decor",
+      category: defaultCat,
       images: "",
       isActive: true,
       sortOrder: 0,
@@ -375,30 +392,49 @@ export default function AdminProducts() {
     }
   };
 
+  useEffect(() => {
+    if (categories && categories.length > 0 && (!form.category || form.category === "home-decor")) {
+      const exists = categories.some((c) => c.slug === form.category);
+      if (!exists) {
+        setForm((prev) => ({ ...prev, category: categories[0].slug }));
+      }
+    }
+  }, [categories]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!form.nameAr.trim()) {
+      toast.error("يرجى كتابة اسم المنتج بالعربي");
+      return;
+    }
+    const cleanPrice = cleanNumber(form.price);
+    if (cleanPrice <= 0 && form.pricingType !== "per_meter") {
+      toast.error("يرجى إدخال سعر بيع صحيح للمنتج");
+      return;
+    }
     if (form.isActive && !hasProductImage(form.images)) {
       toast.error("تنبيه: لتفعيل المنتج ونشره في المتجر يجب إضافة صورة واحدة على الأقل، أو يمكنك إلغاء تفعيل 'منتج نشط' لحفظ التعديلات كمسودة الآن.");
       return;
     }
-    const origPriceNum = form.originalPrice ? parseFloat(form.originalPrice) : null;
+    const origPrice = form.originalPrice ? cleanNumber(form.originalPrice) : null;
+    const effectiveCategory = form.category && form.category !== "home-decor" ? form.category : (categories?.[0]?.slug || "tables");
     const data = {
-      name: form.name,
-      nameAr: form.nameAr,
-      description: form.description || undefined,
-      price: parseFloat(form.price),
-      originalPrice: origPriceNum !== null && !isNaN(origPriceNum) && origPriceNum > 0 ? origPriceNum : null,
+      name: form.name?.trim() || form.nameAr.trim(),
+      nameAr: form.nameAr.trim(),
+      description: form.description?.trim() || undefined,
+      price: cleanPrice,
+      originalPrice: origPrice && origPrice > 0 ? origPrice : null,
       sizes: form.sizes || undefined,
       colors: form.colors || undefined,
       sizeOptions: serializeSizeOptions(sizeRows) || undefined,
       colorOptions: serializeColorOptions(colorRows) || undefined,
       pricingType: form.pricingType as "fixed" | "per_meter",
-      pricePerMeter: form.pricingType === "per_meter" && form.pricePerMeter ? parseFloat(form.pricePerMeter) : undefined,
-      category: form.category,
+      pricePerMeter: form.pricingType === "per_meter" && form.pricePerMeter ? cleanNumber(form.pricePerMeter) : undefined,
+      category: effectiveCategory,
       specifications: serializeSpecifications() || undefined,
       images: form.images || undefined,
       isActive: form.isActive ? "yes" as const : "no" as const,
-      sortOrder: form.sortOrder,
+      sortOrder: Number(form.sortOrder) || 0,
     };
 
     if (editId) {
@@ -468,12 +504,14 @@ export default function AdminProducts() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>اسم المنتج (إنجليزي)</Label>
+                  <Label className="flex items-center justify-between">
+                    <span>اسم المنتج (إنجليزي)</span>
+                    <span className="text-[11px] text-muted-foreground font-normal">(اختياري)</span>
+                  </Label>
                   <Input
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    required
-                    placeholder="e.g. Quran Calligraphy Panel"
+                    placeholder="e.g. Modern Steel Panel (اختياري)"
                   />
                 </div>
                 <div className="space-y-2">

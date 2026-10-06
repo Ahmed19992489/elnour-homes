@@ -1585,32 +1585,36 @@ var appRouter = router({
       return getProductById(input.id);
     }),
     create: adminProcedure.input(z2.object({
-      name: z2.string().min(1),
-      nameAr: z2.string().min(1),
+      name: z2.string().optional(),
+      nameAr: z2.string().min(1, "\u064A\u0631\u062C\u0649 \u0643\u062A\u0627\u0628\u0629 \u0627\u0633\u0645 \u0627\u0644\u0645\u0646\u062A\u062C \u0628\u0627\u0644\u0639\u0631\u0628\u064A"),
       description: z2.string().optional(),
-      price: z2.number().min(0),
-      originalPrice: z2.number().min(0).optional().nullable(),
+      price: z2.coerce.number().min(0),
+      originalPrice: z2.coerce.number().min(0).nullish(),
       sizes: z2.string().optional(),
       colors: z2.string().optional(),
       sizeOptions: z2.string().optional(),
       colorOptions: z2.string().optional(),
       pricingType: z2.enum(["fixed", "per_meter"]).optional(),
-      pricePerMeter: z2.number().min(0).optional(),
-      category: z2.string().min(1).default("home-decor"),
+      pricePerMeter: z2.coerce.number().min(0).optional(),
+      category: z2.string().optional(),
       specifications: z2.string().optional(),
       images: z2.string().optional(),
       isActive: z2.enum(["yes", "no"]).default("yes"),
-      sortOrder: z2.number().default(0)
+      sortOrder: z2.coerce.number().default(0)
     })).mutation(async ({ input }) => {
-      const category = normalizeCategorySlug(input.category);
-      if (!await categorySlugExists(category)) {
-        throw new Error("\u064A\u0631\u062C\u0649 \u0627\u062E\u062A\u064A\u0627\u0631 \u0641\u0626\u0629 \u0635\u0627\u0644\u062D\u0629 \u0645\u0646 \u0627\u0644\u0641\u0626\u0627\u062A \u0627\u0644\u0645\u064F\u062F\u0627\u0631\u0629 \u0641\u064A \u0644\u0648\u062D\u0629 \u0627\u0644\u062A\u062D\u0643\u0645");
+      let category = normalizeCategorySlug(input.category || "");
+      if (!category || !await categorySlugExists(category)) {
+        const allCats = await getAllCategories();
+        const match = allCats.find((c) => c.slug === category);
+        category = match ? match.slug : allCats[0]?.slug || "tables";
       }
       if (input.isActive === "yes" && !hasProductImage(input.images)) {
         throw new Error("\u0623\u0636\u0641 \u0635\u0648\u0631\u0629 \u0648\u0627\u062D\u062F\u0629 \u0639\u0644\u0649 \u0627\u0644\u0623\u0642\u0644 \u0642\u0628\u0644 \u0646\u0634\u0631 \u0627\u0644\u0645\u0646\u062A\u062C \u0641\u064A \u0627\u0644\u0645\u062A\u062C\u0631");
       }
+      const effectiveName = input.name?.trim() || input.nameAr.trim();
       await createProduct({
         ...input,
+        name: effectiveName,
         category,
         price: String(input.price),
         originalPrice: input.originalPrice !== void 0 && input.originalPrice !== null ? String(input.originalPrice) : null,
@@ -1621,22 +1625,22 @@ var appRouter = router({
     }),
     update: adminProcedure.input(z2.object({
       id: z2.number(),
-      name: z2.string().min(1).optional(),
-      nameAr: z2.string().min(1).optional(),
+      name: z2.string().optional(),
+      nameAr: z2.string().optional(),
       description: z2.string().optional(),
-      price: z2.number().min(0).optional(),
-      originalPrice: z2.number().min(0).optional().nullable(),
+      price: z2.coerce.number().min(0).optional(),
+      originalPrice: z2.coerce.number().min(0).nullish(),
       sizes: z2.string().optional(),
       colors: z2.string().optional(),
       sizeOptions: z2.string().optional(),
       colorOptions: z2.string().optional(),
       pricingType: z2.enum(["fixed", "per_meter"]).optional(),
-      pricePerMeter: z2.number().min(0).optional(),
-      category: z2.string().min(1).optional(),
+      pricePerMeter: z2.coerce.number().min(0).optional(),
+      category: z2.string().optional(),
       specifications: z2.string().optional(),
       images: z2.string().optional(),
       isActive: z2.enum(["yes", "no"]).optional(),
-      sortOrder: z2.number().optional()
+      sortOrder: z2.coerce.number().optional()
     })).mutation(async ({ input }) => {
       const { id, ...data } = input;
       const existingProduct = await getProductById(id);
@@ -1648,10 +1652,13 @@ var appRouter = router({
       }
       if (updateData.pricePerMeter !== void 0) updateData.pricePerMeter = String(updateData.pricePerMeter);
       if (updateData.category !== void 0) {
-        updateData.category = normalizeCategorySlug(updateData.category);
-        if (!await categorySlugExists(updateData.category)) {
-          throw new Error("\u064A\u0631\u062C\u0649 \u0627\u062E\u062A\u064A\u0627\u0631 \u0641\u0626\u0629 \u0635\u0627\u0644\u062D\u0629 \u0645\u0646 \u0627\u0644\u0641\u0626\u0627\u062A \u0627\u0644\u0645\u064F\u062F\u0627\u0631\u0629 \u0641\u064A \u0644\u0648\u062D\u0629 \u0627\u0644\u062A\u062D\u0643\u0645");
+        let category = normalizeCategorySlug(updateData.category || "");
+        if (!category || !await categorySlugExists(category)) {
+          const allCats = await getAllCategories();
+          const match = allCats.find((c) => c.slug === category);
+          category = match ? match.slug : allCats[0]?.slug || "tables";
         }
+        updateData.category = category;
       }
       const effectiveStatus = updateData.isActive ?? existingProduct.isActive;
       const effectiveImages = updateData.images ?? existingProduct.images;

@@ -179,33 +179,37 @@ export const appRouter = router({
       }),
     create: adminProcedure
       .input(z.object({
-        name: z.string().min(1),
-        nameAr: z.string().min(1),
+        name: z.string().optional(),
+        nameAr: z.string().min(1, "يرجى كتابة اسم المنتج بالعربي"),
         description: z.string().optional(),
-        price: z.number().min(0),
-        originalPrice: z.number().min(0).optional().nullable(),
+        price: z.coerce.number().min(0),
+        originalPrice: z.coerce.number().min(0).nullish(),
         sizes: z.string().optional(),
         colors: z.string().optional(),
         sizeOptions: z.string().optional(),
         colorOptions: z.string().optional(),
         pricingType: z.enum(["fixed", "per_meter"]).optional(),
-        pricePerMeter: z.number().min(0).optional(),
-        category: z.string().min(1).default("home-decor"),
+        pricePerMeter: z.coerce.number().min(0).optional(),
+        category: z.string().optional(),
         specifications: z.string().optional(),
         images: z.string().optional(),
         isActive: z.enum(["yes", "no"]).default("yes"),
-        sortOrder: z.number().default(0),
+        sortOrder: z.coerce.number().default(0),
       }))
       .mutation(async ({ input }) => {
-        const category = normalizeCategorySlug(input.category);
-        if (!await db.categorySlugExists(category)) {
-          throw new Error("يرجى اختيار فئة صالحة من الفئات المُدارة في لوحة التحكم");
+        let category = normalizeCategorySlug(input.category || "");
+        if (!category || !(await db.categorySlugExists(category))) {
+          const allCats = await db.getAllCategories();
+          const match = allCats.find((c) => c.slug === category);
+          category = match ? match.slug : (allCats[0]?.slug || "tables");
         }
         if (input.isActive === "yes" && !hasProductImage(input.images)) {
           throw new Error("أضف صورة واحدة على الأقل قبل نشر المنتج في المتجر");
         }
+        const effectiveName = input.name?.trim() || input.nameAr.trim();
         await db.createProduct({
           ...input,
+          name: effectiveName,
           category,
           price: String(input.price),
           originalPrice: input.originalPrice !== undefined && input.originalPrice !== null ? String(input.originalPrice) : null,
@@ -217,22 +221,22 @@ export const appRouter = router({
     update: adminProcedure
       .input(z.object({
         id: z.number(),
-        name: z.string().min(1).optional(),
-        nameAr: z.string().min(1).optional(),
+        name: z.string().optional(),
+        nameAr: z.string().optional(),
         description: z.string().optional(),
-        price: z.number().min(0).optional(),
-        originalPrice: z.number().min(0).optional().nullable(),
+        price: z.coerce.number().min(0).optional(),
+        originalPrice: z.coerce.number().min(0).nullish(),
         sizes: z.string().optional(),
         colors: z.string().optional(),
         sizeOptions: z.string().optional(),
         colorOptions: z.string().optional(),
         pricingType: z.enum(["fixed", "per_meter"]).optional(),
-        pricePerMeter: z.number().min(0).optional(),
-        category: z.string().min(1).optional(),
+        pricePerMeter: z.coerce.number().min(0).optional(),
+        category: z.string().optional(),
         specifications: z.string().optional(),
         images: z.string().optional(),
         isActive: z.enum(["yes", "no"]).optional(),
-        sortOrder: z.number().optional(),
+        sortOrder: z.coerce.number().optional(),
       }))
       .mutation(async ({ input }) => {
         const { id, ...data } = input;
@@ -245,10 +249,13 @@ export const appRouter = router({
         }
         if (updateData.pricePerMeter !== undefined) updateData.pricePerMeter = String(updateData.pricePerMeter);
         if (updateData.category !== undefined) {
-          updateData.category = normalizeCategorySlug(updateData.category);
-          if (!await db.categorySlugExists(updateData.category)) {
-            throw new Error("يرجى اختيار فئة صالحة من الفئات المُدارة في لوحة التحكم");
+          let category = normalizeCategorySlug(updateData.category || "");
+          if (!category || !(await db.categorySlugExists(category))) {
+            const allCats = await db.getAllCategories();
+            const match = allCats.find((c) => c.slug === category);
+            category = match ? match.slug : (allCats[0]?.slug || "tables");
           }
+          updateData.category = category;
         }
         const effectiveStatus = updateData.isActive ?? existingProduct.isActive;
         const effectiveImages = updateData.images ?? existingProduct.images;
