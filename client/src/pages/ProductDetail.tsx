@@ -322,6 +322,10 @@ export default function ProductDetail() {
   const currency = lang === "ar" ? "ج.م" : "EGP";
 
   const priceValue = product?.price ? parseFloat(product.price) : 0;
+  const originalPriceNum = (product as any)?.originalPrice ? parseFloat((product as any).originalPrice) : 0;
+  const hasDiscount = originalPriceNum > priceValue && priceValue > 0;
+  const discountPercent = hasDiscount ? Math.round(((originalPriceNum - priceValue) / originalPriceNum) * 100) : 0;
+  const discountSavings = hasDiscount ? Math.round(originalPriceNum - priceValue) : 0;
   const couponDiscount = couponState.valid ? couponState.discount : 0;
 
   // Dynamic price: size option price overrides base price when selected.
@@ -657,9 +661,14 @@ export default function ProductDetail() {
           {/* Details */}
           <div className="space-y-5">
             <div>
-              <div className="flex items-center gap-2 mb-2">
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
                 <Badge variant="secondary" className="bg-amber-50 text-[#8b6821] border border-amber-200">{product.category}</Badge>
                 {product.featured ? <Badge className="bg-[#24211d] text-[#e3c97d]">مميز</Badge> : null}
+                {hasDiscount && !isPerMeter ? (
+                  <Badge className="bg-red-600 text-white font-bold hover:bg-red-700">
+                    {lang === "ar" ? `خصم ${discountPercent}%` : `${discountPercent}% OFF`}
+                  </Badge>
+                ) : null}
               </div>
               <h1 className="text-2xl sm:text-3xl font-black text-[#24211d] leading-tight mb-2">{displayName}</h1>
               {lang === "en" && product.nameAr && (
@@ -670,14 +679,26 @@ export default function ProductDetail() {
             {/* Price Box */}
             <div className="p-3.5 rounded-2xl bg-gradient-to-r from-[#faf8f5] to-[#f4efe4] border border-[#e3dbc9]">
               <div className="flex items-baseline justify-between flex-wrap gap-2">
-                <div className="text-2xl sm:text-3xl font-black text-[#96702a]">
-                  <span>{isPerMeter ? (
-                    <>{formatPrice(pricePerMeterValue)} <span className="text-base text-muted-foreground">{lang === "ar" ? "ج.م / متر" : "EGP / meter"}</span>{priceValue ? <span className="ms-2 text-sm font-medium text-muted-foreground">({lang === "ar" ? "يبدأ من" : "from"} {formatPrice(priceValue)} {currency})</span> : null}</>
-                  ) : sizeOptions.length && selectedSize ? (
-                    <>{formatPrice(sizePriceValue)} <span className="text-base font-bold text-[#514c42]">{currency}</span></>
-                  ) : (
-                    <>{product.price} <span className="text-base font-bold text-[#514c42]">{currency}</span></>
-                  )}</span>
+                <div>
+                  {hasDiscount && !isPerMeter ? (
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-sm sm:text-base text-[#8a806f] line-through font-semibold">
+                        {formatPrice(originalPriceNum)} {currency}
+                      </span>
+                      <span className="text-xs font-black bg-red-600 text-white px-2.5 py-0.5 rounded-full shadow-sm">
+                        {lang === "ar" ? `وفر ${formatPrice(discountSavings)} ${currency} (${discountPercent}%-)` : `Save ${formatPrice(discountSavings)} ${currency} (-${discountPercent}%)`}
+                      </span>
+                    </div>
+                  ) : null}
+                  <div className="text-2xl sm:text-3xl font-black text-[#96702a]">
+                    <span>{isPerMeter ? (
+                      <>{formatPrice(pricePerMeterValue)} <span className="text-base text-muted-foreground">{lang === "ar" ? "ج.م / متر" : "EGP / meter"}</span>{priceValue ? <span className="ms-2 text-sm font-medium text-muted-foreground">({lang === "ar" ? "يبدأ من" : "from"} {formatPrice(priceValue)} {currency})</span> : null}</>
+                    ) : sizeOptions.length && selectedSize ? (
+                      <>{formatPrice(sizePriceValue)} <span className="text-base font-bold text-[#514c42]">{currency}</span></>
+                    ) : (
+                      <>{product.price} <span className="text-base font-bold text-[#514c42]">{currency}</span></>
+                    )}</span>
+                  </div>
                 </div>
                 <span className="text-xs font-bold text-[#25d366] bg-green-50 px-2.5 py-1 rounded-full border border-green-200">
                   {lang === "ar" ? "شحن ومعاينة متوفرة" : "Delivery Available"}

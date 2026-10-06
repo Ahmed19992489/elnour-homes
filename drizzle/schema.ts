@@ -36,6 +36,7 @@ export const products = pgTable("products", {
   description: text("description"),
   descriptionAr: text("description_ar"),
   price: varchar("price", { length: 50 }).notNull(),
+  originalPrice: varchar("original_price", { length: 50 }),
   sizes: text("sizes"),
   sizeOptions: text("size_options"),
   colorOptions: text("color_options"),

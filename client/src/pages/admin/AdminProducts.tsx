@@ -76,6 +76,7 @@ export default function AdminProducts() {
     nameAr: "",
     description: "",
     price: "",
+    originalPrice: "",
     sizes: "",
     colors: "",
     sizeOptions: "",
@@ -318,6 +319,7 @@ export default function AdminProducts() {
       nameAr: "",
       description: "",
       price: "",
+      originalPrice: "",
       sizes: "",
       colors: "",
       sizeOptions: "",
@@ -379,11 +381,13 @@ export default function AdminProducts() {
       toast.error("تنبيه: لتفعيل المنتج ونشره في المتجر يجب إضافة صورة واحدة على الأقل، أو يمكنك إلغاء تفعيل 'منتج نشط' لحفظ التعديلات كمسودة الآن.");
       return;
     }
+    const origPriceNum = form.originalPrice ? parseFloat(form.originalPrice) : null;
     const data = {
       name: form.name,
       nameAr: form.nameAr,
       description: form.description || undefined,
       price: parseFloat(form.price),
+      originalPrice: origPriceNum !== null && !isNaN(origPriceNum) && origPriceNum > 0 ? origPriceNum : null,
       sizes: form.sizes || undefined,
       colors: form.colors || undefined,
       sizeOptions: serializeSizeOptions(sizeRows) || undefined,
@@ -410,7 +414,8 @@ export default function AdminProducts() {
       name: product.name,
       nameAr: product.nameAr,
       description: product.description || "",
-      price: String(product.price),
+      price: String(product.price ?? ""),
+      originalPrice: (product as any).originalPrice ? String((product as any).originalPrice) : "",
       sizes: product.sizes || "",
       colors: product.colors || "",
       sizeOptions: product.sizeOptions || "",
@@ -501,17 +506,70 @@ export default function AdminProducts() {
                     </div>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>السعر (ج.م)</Label>
+                    <Label className="flex items-center justify-between">
+                      <span className="font-semibold text-slate-700">السعر قبل الخصم (ج.م)</span>
+                      <span className="text-[11px] text-muted-foreground font-normal">(اختياري - في حال وجود خصم)</span>
+                    </Label>
+                    <Input
+                      type="number"
+                      value={form.originalPrice}
+                      onChange={(e) => setForm({ ...form, originalPrice: e.target.value })}
+                      min="0"
+                      placeholder="مثال: 2500"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="flex items-center justify-between">
+                      <span className="font-bold text-amber-700">السعر بعد الخصم / سعر البيع (ج.م) *</span>
+                      <span className="text-[11px] text-emerald-600 font-medium">(السعر الفعلي المطلوب)</span>
+                    </Label>
                     <Input
                       type="number"
                       value={form.price}
                       onChange={(e) => setForm({ ...form, price: e.target.value })}
                       required
                       min="0"
+                      placeholder="مثال: 1950"
                     />
                   </div>
+                </div>
+
+                {/* مؤشر الخصم المباشر التفاعلي */}
+                {(() => {
+                  const orig = parseFloat(form.originalPrice);
+                  const curr = parseFloat(form.price);
+                  if (!isNaN(orig) && !isNaN(curr) && orig > curr && curr > 0) {
+                    const diff = Math.round(orig - curr);
+                    const pct = Math.round((diff / orig) * 100);
+                    return (
+                      <div className="rounded-xl border border-emerald-300 bg-emerald-50/80 p-3 text-xs text-emerald-900 flex flex-wrap items-center justify-between gap-2 shadow-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="rounded-full bg-emerald-600 text-white font-bold px-2 py-0.5 text-[11px]">
+                            خصم {pct}%
+                          </span>
+                          <span className="font-medium">
+                            سيظهر للعميل كعرض تخفيض مع شطب السعر الأصلي ({orig.toLocaleString()} ج.م).
+                          </span>
+                        </div>
+                        <span className="font-bold text-emerald-700">
+                          قيمة التوفير: {diff.toLocaleString()} ج.م
+                        </span>
+                      </div>
+                    );
+                  }
+                  if (!isNaN(orig) && !isNaN(curr) && orig <= curr && orig > 0) {
+                    return (
+                      <div className="rounded-lg border border-amber-200 bg-amber-50/70 p-2 text-xs text-amber-800">
+                        ⚠️ ملاحظة: السعر قبل الخصم أصغر من أو يساوي سعر البيع. لن تظهر شارة الخصم للعميل إلا إذا كان السعر قبل الخصم أعلى من سعر البيع.
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>الفئة</Label>
                     <Select value={form.category} onValueChange={(value) => setForm({ ...form, category: value })}>
@@ -858,7 +916,21 @@ export default function AdminProducts() {
                             <p className="text-xs text-muted-foreground">{product.name}</p>
                           </TableCell>
                           <TableCell>{categories?.find((category) => category.slug === product.category)?.nameAr || product.category || "—"}</TableCell>
-                          <TableCell className="font-bold text-amber-600">{product.price} ج.م</TableCell>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span className="font-bold text-amber-600">{product.price} ج.م</span>
+                              {(product as any).originalPrice && Number((product as any).originalPrice) > Number(product.price) && (
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  <span className="text-xs text-muted-foreground line-through">
+                                    {(product as any).originalPrice} ج.م
+                                  </span>
+                                  <span className="text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 px-1 rounded">
+                                    {Math.round((((Number((product as any).originalPrice) - Number(product.price)) / Number((product as any).originalPrice)) * 100))}%-
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
                           <TableCell>
                             <Badge variant={product.isActive === "yes" ? "default" : "secondary"}>
                               {product.isActive === "yes" ? "منشور" : "غير منشور"}

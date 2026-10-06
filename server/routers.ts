@@ -183,6 +183,7 @@ export const appRouter = router({
         nameAr: z.string().min(1),
         description: z.string().optional(),
         price: z.number().min(0),
+        originalPrice: z.number().min(0).optional().nullable(),
         sizes: z.string().optional(),
         colors: z.string().optional(),
         sizeOptions: z.string().optional(),
@@ -207,6 +208,7 @@ export const appRouter = router({
           ...input,
           category,
           price: String(input.price),
+          originalPrice: input.originalPrice !== undefined && input.originalPrice !== null ? String(input.originalPrice) : null,
           pricePerMeter: input.pricePerMeter !== undefined ? String(input.pricePerMeter) : undefined,
           pricingType: input.pricingType ?? "fixed",
         });
@@ -219,6 +221,7 @@ export const appRouter = router({
         nameAr: z.string().min(1).optional(),
         description: z.string().optional(),
         price: z.number().min(0).optional(),
+        originalPrice: z.number().min(0).optional().nullable(),
         sizes: z.string().optional(),
         colors: z.string().optional(),
         sizeOptions: z.string().optional(),
@@ -237,6 +240,9 @@ export const appRouter = router({
         if (!existingProduct) throw new Error("المنتج غير موجود");
         const updateData: any = { ...data };
         if (updateData.price !== undefined) updateData.price = String(updateData.price);
+        if (updateData.originalPrice !== undefined) {
+          updateData.originalPrice = updateData.originalPrice !== null && updateData.originalPrice !== undefined ? String(updateData.originalPrice) : null;
+        }
         if (updateData.pricePerMeter !== undefined) updateData.pricePerMeter = String(updateData.pricePerMeter);
         if (updateData.category !== undefined) {
           updateData.category = normalizeCategorySlug(updateData.category);

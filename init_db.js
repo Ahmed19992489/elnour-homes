@@ -69,6 +69,7 @@ async function main() {
       name_ar VARCHAR(255) NOT NULL,
       description TEXT,
       price VARCHAR(50) NOT NULL,
+      original_price VARCHAR(50),
       pricing_type VARCHAR(50) DEFAULT 'fixed',
       price_per_meter VARCHAR(50),
       category VARCHAR(100) NOT NULL DEFAULT 'home-decor',
@@ -77,6 +78,10 @@ async function main() {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
+  `;
+
+  await sql`
+    ALTER TABLE products ADD COLUMN IF NOT EXISTS original_price VARCHAR(50);
   `;
 
   await sql`

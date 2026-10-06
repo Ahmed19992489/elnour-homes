@@ -264,13 +264,29 @@ export async function upsertSetting(key: string, value: string | null) {
 
 // ===== PRODUCTS =====
 
+let _productsOriginalPriceChecked = false;
+export async function ensureProductColumns(): Promise<void> {
+  if (_productsOriginalPriceChecked) return;
+  const url = process.env.DATABASE_URL || ENV.databaseUrl;
+  if (!url) return;
+  try {
+    const rawSql = neon(url);
+    await rawSql`ALTER TABLE products ADD COLUMN IF NOT EXISTS original_price VARCHAR(50);`;
+    _productsOriginalPriceChecked = true;
+  } catch (err) {
+    console.error("[Database] Error ensuring original_price column:", err);
+  }
+}
+
 export async function getActiveProducts() {
+  await ensureProductColumns();
   const db = getDb();
   if (!db) return [];
   return db.select().from(products).where(eq(products.isActive, "yes")).orderBy(products.sortOrder);
 }
 
 export async function getActiveProductsByCategory(categorySlug: string) {
+  await ensureProductColumns();
   const db = getDb();
   if (!db) return [];
   return db.select().from(products)
@@ -279,12 +295,14 @@ export async function getActiveProductsByCategory(categorySlug: string) {
 }
 
 export async function getAllProducts() {
+  await ensureProductColumns();
   const db = getDb();
   if (!db) return [];
   return db.select().from(products).orderBy(products.sortOrder);
 }
 
 export async function getProductById(id: number) {
+  await ensureProductColumns();
   const db = getDb();
   if (!db) return undefined;
   const result = await db.select().from(products).where(eq(products.id, id)).limit(1);
@@ -292,12 +310,14 @@ export async function getProductById(id: number) {
 }
 
 export async function createProduct(data: InsertProduct) {
+  await ensureProductColumns();
   const db = getDb();
   if (!db) throw new Error("Database not available");
   return db.insert(products).values(data).returning();
 }
 
 export async function updateProduct(id: number, data: Partial<InsertProduct>) {
+  await ensureProductColumns();
   const db = getDb();
   if (!db) throw new Error("Database not available");
   const updateSet: Record<string, unknown> = {};

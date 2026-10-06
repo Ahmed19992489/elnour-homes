@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Link } from "wouter";
 import { useLanguage } from "@/contexts/LanguageContext";
 import PublicLayout from "@/components/storefront/PublicLayout";
+import ProductCard from "@/components/storefront/ProductCard";
 import { UpdateHead } from "@/components/UpdateHead";
 
 function Countdown({ targetAt }: { targetAt: number }) {
@@ -35,6 +36,10 @@ function Countdown({ targetAt }: { targetAt: number }) {
 export default function OffersPage() {
   const { lang, t } = useLanguage();
   const { data: coupons, isLoading } = trpc.coupons.getOffers.useQuery();
+  const { data: products } = trpc.products.active.useQuery();
+  const discountedProducts = (products ?? []).filter(
+    (p) => (p as any).originalPrice && Number((p as any).originalPrice) > Number(p.price)
+  );
   const [copied, setCopied] = useState<string | null>(null);
 
   UpdateHead({
@@ -113,6 +118,36 @@ export default function OffersPage() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {discountedProducts.length > 0 && (
+          <div className="mt-16 border-t border-[#e3dbc9] pt-12">
+            <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+              <div>
+                <Badge variant="secondary" className="mb-2 bg-red-50 text-red-700 border-red-200">
+                  {lang === "ar" ? "تخفيضات مباشرة محدودة" : "Direct Limited Discounts"}
+                </Badge>
+                <h2 className="text-2xl font-black text-[#24211d] sm:text-3xl">
+                  {lang === "ar" ? "منتجات عليها خصومات حالية" : "Products On Sale"}
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {lang === "ar"
+                    ? "تسوّق أفضل قطع وديكورات الاستيل بأسعار مخفضة فورية بدون الحاجة لكوبون"
+                    : "Shop luxury steel furniture & decor with instant discounts applied"}
+                </p>
+              </div>
+              <Link href="/products">
+                <Button variant="outline" className="border-[#ad842f] text-[#8b6821]">
+                  {lang === "ar" ? "تصفح كل المنتجات" : "Browse All Products"}
+                </Button>
+              </Link>
+            </div>
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {discountedProducts.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
           </div>
         )}
       </div>

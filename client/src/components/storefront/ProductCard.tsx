@@ -15,6 +15,7 @@ type ProductCardProps = {
     nameAr: string;
     description: string | null;
     price: string;
+    originalPrice?: string | null;
     images: string | null;
   };
   categoryName?: string;
@@ -36,13 +37,23 @@ export default function ProductCard({ product, categoryName }: ProductCardProps)
   const { data: ratingData } = trpc.reviews.forProduct.useQuery({ productId: product.id });
   const reviewSummary = ratingData && ratingData.stats.count > 0 ? ratingData.stats : null;
   const imageCount = parseProductImages(product.images).length;
-  const price = Number(product.price || 0).toLocaleString(lang === "ar" ? "ar-EG" : "en-US");
+  const currentPriceNum = Number(product.price || 0);
+  const originalPriceNum = product.originalPrice ? Number(product.originalPrice) : 0;
+  const hasDiscount = originalPriceNum > currentPriceNum && currentPriceNum > 0;
+  const discountPercent = hasDiscount ? Math.round(((originalPriceNum - currentPriceNum) / originalPriceNum) * 100) : 0;
+  const price = currentPriceNum.toLocaleString(lang === "ar" ? "ar-EG" : "en-US");
+  const formattedOriginalPrice = originalPriceNum.toLocaleString(lang === "ar" ? "ar-EG" : "en-US");
   const title = lang === "ar" ? product.nameAr : product.name;
 
   return (
     <article className="group overflow-hidden rounded-2xl border border-[#e0dacd] bg-white shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-xl">
       <Link href={`/product/${product.id}`} className="relative block aspect-[4/3] overflow-hidden bg-[#eee9df]">
         {image ? <img src={image} alt={title} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" /> : <div className="flex h-full items-center justify-center text-[#ad842f]"><PackageOpen className="h-10 w-10" /></div>}
+        {hasDiscount ? (
+          <span className={`absolute top-2.5 ${isRTL ? "right-2.5" : "left-2.5"} z-10 inline-flex items-center rounded-full bg-gradient-to-r from-red-600 to-rose-500 px-2.5 py-0.5 text-xs font-black text-white shadow-md`}>
+            {lang === "ar" ? `خصم ${discountPercent}%` : `-${discountPercent}%`}
+          </span>
+        ) : null}
         <button
           type="button"
           aria-label={lang === "ar" ? "أضف إلى المفضلة" : "Add to wishlist"}
@@ -63,7 +74,14 @@ export default function ProductCard({ product, categoryName }: ProductCardProps)
           </div>
         ) : null}
         <div className="flex items-end justify-between gap-3">
-          <p className="text-base font-black text-[#24211d]">{price} <span className="text-xs font-medium">{lang === "ar" ? "ج.م" : "EGP"}</span></p>
+          <div className="flex flex-col">
+            {hasDiscount ? (
+              <span className="text-xs text-[#8a806f] line-through font-medium">
+                {formattedOriginalPrice} <span className="text-[10px]">{lang === "ar" ? "ج.م" : "EGP"}</span>
+              </span>
+            ) : null}
+            <p className="text-base font-black text-[#24211d]">{price} <span className="text-xs font-medium">{lang === "ar" ? "ج.م" : "EGP"}</span></p>
+          </div>
           <div className="flex items-center gap-1.5">
             <button
               type="button"

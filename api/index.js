@@ -260,6 +260,7 @@ var products = pgTable("products", {
   description: text("description"),
   descriptionAr: text("description_ar"),
   price: varchar("price", { length: 50 }).notNull(),
+  originalPrice: varchar("original_price", { length: 50 }),
   sizes: text("sizes"),
   sizeOptions: text("size_options"),
   colorOptions: text("color_options"),
@@ -641,33 +642,52 @@ async function upsertSetting(key, value) {
   });
   return getSetting(key);
 }
+var _productsOriginalPriceChecked = false;
+async function ensureProductColumns() {
+  if (_productsOriginalPriceChecked) return;
+  const url = process.env.DATABASE_URL || ENV.databaseUrl;
+  if (!url) return;
+  try {
+    const rawSql = neon(url);
+    await rawSql`ALTER TABLE products ADD COLUMN IF NOT EXISTS original_price VARCHAR(50);`;
+    _productsOriginalPriceChecked = true;
+  } catch (err) {
+    console.error("[Database] Error ensuring original_price column:", err);
+  }
+}
 async function getActiveProducts() {
+  await ensureProductColumns();
   const db = getDb();
   if (!db) return [];
   return db.select().from(products).where(eq(products.isActive, "yes")).orderBy(products.sortOrder);
 }
 async function getActiveProductsByCategory(categorySlug) {
+  await ensureProductColumns();
   const db = getDb();
   if (!db) return [];
   return db.select().from(products).where(and(eq(products.isActive, "yes"), eq(products.category, categorySlug))).orderBy(products.sortOrder);
 }
 async function getAllProducts() {
+  await ensureProductColumns();
   const db = getDb();
   if (!db) return [];
   return db.select().from(products).orderBy(products.sortOrder);
 }
 async function getProductById(id) {
+  await ensureProductColumns();
   const db = getDb();
   if (!db) return void 0;
   const result = await db.select().from(products).where(eq(products.id, id)).limit(1);
   return result.length > 0 ? result[0] : void 0;
 }
 async function createProduct(data) {
+  await ensureProductColumns();
   const db = getDb();
   if (!db) throw new Error("Database not available");
   return db.insert(products).values(data).returning();
 }
 async function updateProduct(id, data) {
+  await ensureProductColumns();
   const db = getDb();
   if (!db) throw new Error("Database not available");
   const updateSet = {};
@@ -1569,6 +1589,7 @@ var appRouter = router({
       nameAr: z2.string().min(1),
       description: z2.string().optional(),
       price: z2.number().min(0),
+      originalPrice: z2.number().min(0).optional().nullable(),
       sizes: z2.string().optional(),
       colors: z2.string().optional(),
       sizeOptions: z2.string().optional(),
@@ -1592,6 +1613,7 @@ var appRouter = router({
         ...input,
         category,
         price: String(input.price),
+        originalPrice: input.originalPrice !== void 0 && input.originalPrice !== null ? String(input.originalPrice) : null,
         pricePerMeter: input.pricePerMeter !== void 0 ? String(input.pricePerMeter) : void 0,
         pricingType: input.pricingType ?? "fixed"
       });
@@ -1603,6 +1625,7 @@ var appRouter = router({
       nameAr: z2.string().min(1).optional(),
       description: z2.string().optional(),
       price: z2.number().min(0).optional(),
+      originalPrice: z2.number().min(0).optional().nullable(),
       sizes: z2.string().optional(),
       colors: z2.string().optional(),
       sizeOptions: z2.string().optional(),
@@ -1620,6 +1643,9 @@ var appRouter = router({
       if (!existingProduct) throw new Error("\u0627\u0644\u0645\u0646\u062A\u062C \u063A\u064A\u0631 \u0645\u0648\u062C\u0648\u062F");
       const updateData = { ...data };
       if (updateData.price !== void 0) updateData.price = String(updateData.price);
+      if (updateData.originalPrice !== void 0) {
+        updateData.originalPrice = updateData.originalPrice !== null && updateData.originalPrice !== void 0 ? String(updateData.originalPrice) : null;
+      }
       if (updateData.pricePerMeter !== void 0) updateData.pricePerMeter = String(updateData.pricePerMeter);
       if (updateData.category !== void 0) {
         updateData.category = normalizeCategorySlug(updateData.category);
