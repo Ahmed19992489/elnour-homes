@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Phone, MapPin, MessageCircle, Clock, Send, CheckCircle2 } from "lucide-react";
+import { Phone, MapPin, MessageCircle, Clock, Send, CheckCircle2, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import PublicLayout from "@/components/storefront/PublicLayout";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -9,7 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
-const DEFAULT_BUSINESS_WHATSAPP = "01118182424";
+const BOOKING_WHATSAPP = "01041939388";
+const AFTERSALES_PHONE = "01118182424";
+const SECONDARY_PHONE = "01114323218";
 const DEFAULT_FACEBOOK = "https://www.facebook.com/Elnour.home";
 
 function waNumber(n: string): string {
@@ -23,8 +25,8 @@ export default function ContactPage() {
     title: lang === "ar" ? "اتصل بنا | Elnour Home - النور هوم" : "Contact Us | Elnour Home",
     description:
       lang === "ar"
-        ? "تواصل مع Elnour Home (النور هوم) عبر واتساب الأعمال أو الهاتف أو نموذج الرسائل. نرد على استفساراتك عن الأثاث وديكورات الاستيل والأسعار والتصاميم المخصصة."
-        : "Contact Elnour Home via Business WhatsApp, phone, or message form. We reply to your inquiries about luxury furniture, steel decor, pricing, and custom designs.",
+        ? "تواصل مع Elnour Home (النور هوم) عبر واتساب الحجز 01041939388، أو خدمة ما بعد البيع 01118182424، أو عبر نموذج الرسائل."
+        : "Contact Elnour Home via Booking WhatsApp 01041939388 or After-Sales Service 01118182424.",
     path: "/contact",
   });
   const [form, setForm] = useState({ name: "", phone: "", email: "", subject: "", message: "" });
@@ -36,50 +38,55 @@ export default function ContactPage() {
     onError: (e) => toast.error(e.message || (lang === "ar" ? "حدث خطأ، حاول مرة أخرى" : "Something went wrong, try again")),
   });
 
-  const waLink = `https://wa.me/${waNumber(DEFAULT_BUSINESS_WHATSAPP)}`;
-  const phoneDisplay = "+20 111 818 2424 / +20 111 432 3218";
+  const bookingWaLink = `https://wa.me/${waNumber(BOOKING_WHATSAPP)}`;
+  const aftersalesWaLink = `https://wa.me/${waNumber(AFTERSALES_PHONE)}?text=${encodeURIComponent("مرحباً، أود التواصل مع خدمة ما بعد البيع والدعم بخصوص طلبي")}`;
+  const phoneDisplay = `+20 ${AFTERSALES_PHONE.slice(1)} / +20 ${SECONDARY_PHONE.slice(1)}`;
 
   const blocks = [
     {
       icon: MessageCircle,
-      titleAr: "واتساب الأعمال",
-      titleEn: "Business WhatsApp",
-      valueAr: "راسلنا مباشرة عبر واتساب — نرد سريعًا",
-      valueEn: "Message us directly on WhatsApp — fast replies",
-      href: waLink,
-      ctaAr: "افتح المحادثة",
-      ctaEn: "Open chat",
+      titleAr: "واتساب الحجز والطلبات",
+      titleEn: "Booking & Orders WhatsApp",
+      valueAr: "01041939388 — احجز أي منتج أو استفسر عن التصاميم والأسعار",
+      valueEn: "01041939388 — Book any product or inquire about designs & prices",
+      href: bookingWaLink,
+      ctaAr: "احجز عبر واتساب الآن",
+      ctaEn: "Book via WhatsApp",
+      highlight: true,
+    },
+    {
+      icon: ShieldCheck,
+      titleAr: "خدمة ما بعد البيع والدعم",
+      titleEn: "After-Sales & Customer Care",
+      valueAr: "01118182424 — متابعة الطلبات والشحن، الضمان، والاسترجاع",
+      valueEn: "01118182424 — Order tracking, shipping, warranty & returns",
+      href: aftersalesWaLink,
+      ctaAr: "تواصل مع خدمة ما بعد البيع",
+      ctaEn: "After-Sales Support",
+      highlight: false,
     },
     {
       icon: Phone,
-      titleAr: "اتصل بنا",
+      titleAr: "الاتصال الهاتفي المباشر",
       titleEn: "Call Us",
       valueAr: phoneDisplay,
       valueEn: phoneDisplay,
-      href: `tel:+201118182424`,
+      href: `tel:+20${AFTERSALES_PHONE.slice(1)}`,
       ctaAr: "اتصل الآن",
       ctaEn: "Call now",
+      highlight: false,
     },
     {
       icon: MapPin,
-      titleAr: "صفحة فيسبوك",
-      titleEn: "Facebook Page",
-      valueAr: "تابع أعمالنا الجديدة والعروض على صفحتنا الرسمية",
-      valueEn: "Follow our latest work and offers on our official page",
+      titleAr: "صفحة فيسبوك الرسمية",
+      titleEn: "Official Facebook Page",
+      valueAr: "تابع أعمالنا الجديدة والعروض الحصرية على صفحتنا",
+      valueEn: "Follow our latest work and exclusive offers",
       href: DEFAULT_FACEBOOK,
       external: true,
       ctaAr: "افتح الصفحة",
       ctaEn: "Open page",
-    },
-    {
-      icon: Clock,
-      titleAr: "ساعات العمل",
-      titleEn: "Working Hours",
-      valueAr: "السبت – الخميس: 9 صباحًا – 11 مساءً",
-      valueEn: "Sat – Thu: 9:00 AM – 11:00 PM",
-      href: waLink,
-      ctaAr: "راسلنا",
-      ctaEn: "Message us",
+      highlight: false,
     },
   ];
 
@@ -105,17 +112,20 @@ export default function ContactPage() {
             <a
               key={i}
               href={b.href}
-              target={b.external ? "_blank" : undefined}
-              rel={b.external ? "noopener noreferrer" : undefined}
-              className="group flex items-start gap-4 rounded-2xl border border-[#e5e0d4] bg-white p-6 transition-all duration-200 hover:border-[#d5af58] hover:shadow-lg hover:shadow-[#d5af58]/10"
+              target={b.external || b.href.startsWith("http") ? "_blank" : undefined}
+              rel={b.external || b.href.startsWith("http") ? "noopener noreferrer" : undefined}
+              className={`group flex items-start gap-4 rounded-2xl border p-6 transition-all duration-200 hover:shadow-lg ${b.highlight ? "border-emerald-300 bg-emerald-50/40 hover:border-emerald-500 hover:shadow-emerald-500/15" : "border-[#e5e0d4] bg-white hover:border-[#d5af58] hover:shadow-[#d5af58]/10"}`}
             >
-              <b.icon className="mt-1 h-6 w-6 shrink-0 text-[#d5af58]" />
+              <b.icon className={`mt-1 h-6 w-6 shrink-0 ${b.highlight ? "text-[#25d366]" : "text-[#d5af58]"}`} />
               <div className="min-w-0">
-                <p className="font-black text-[#24211d]">{lang === "ar" ? b.titleAr : b.titleEn}</p>
+                <p className="font-black text-[#24211d] flex items-center gap-2">
+                  <span>{lang === "ar" ? b.titleAr : b.titleEn}</span>
+                  {b.highlight ? <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold">{lang === "ar" ? "حجز فوري" : "Instant"}</span> : null}
+                </p>
                 <p className="mt-1 text-sm leading-6 text-[#6b6459]">
                   {lang === "ar" ? b.valueAr : b.valueEn}
                 </p>
-                <p className="mt-2 text-sm font-bold text-[#b8892f] group-hover:text-[#a37520]">
+                <p className={`mt-2 text-sm font-bold ${b.highlight ? "text-emerald-700 group-hover:text-emerald-800" : "text-[#b8892f] group-hover:text-[#a37520]"}`}>
                   {lang === "ar" ? b.ctaAr : b.ctaEn}
                 </p>
               </div>

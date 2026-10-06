@@ -116,15 +116,15 @@ export default function AdminSettings() {
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
                 <MessageCircle className="h-4 w-4 text-green-600" />
-                رقم الواتساب (واتساب أعمال)
+                رقم واتساب الحجز والطلبات (الافتراضي: 01041939388)
               </Label>
               <Input
                 value={whatsappNumber}
                 onChange={(e) => setWhatsappNumber(e.target.value)}
-                placeholder="01118182424"
+                placeholder="01041939388"
                 dir="ltr"
               />
-              <p className="text-xs text-muted-foreground">اكتب الرقم بصيغة 0XXXXXXXXXX</p>
+              <p className="text-xs text-muted-foreground">الرقم المخصص لاستقبال حجوزات وطلبات العملاء عبر واتساب (صيغة: 0XXXXXXXXXX)</p>
             </div>
             <div className="space-y-2">
               <Label>الرسالة الافتراضية في واتساب (اختياري)</Label>
@@ -138,7 +138,7 @@ export default function AdminSettings() {
             <div className="space-y-2">
               <Label className="flex items-center gap-2">
                 <Phone className="h-4 w-4" />
-                رقم الهاتف (اختياري)
+                رقم خدمة ما بعد البيع والدعم (الافتراضي: 01118182424)
               </Label>
               <Input
                 value={phone}
@@ -146,6 +146,7 @@ export default function AdminSettings() {
                 placeholder="01118182424"
                 dir="ltr"
               />
+              <p className="text-xs text-muted-foreground">الرقم المخصص لخدمة ما بعد البيع ومتابعة الشحنات والاتصالات الهاتفية</p>
             </div>
             <Button type="submit" disabled={updateMutation.isPending} className="gap-2">
               {updateMutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}

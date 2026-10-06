@@ -19,7 +19,8 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import CustomerAuthDialog from "./CustomerAuthDialog";
 
-const BUSINESS_PHONE = "01118182424";
+const BOOKING_WHATSAPP = "01041939388";
+const AFTERSALES_PHONE = "01118182424";
 
 export default function Navbar() {
   const [location] = useLocation();
@@ -259,12 +260,12 @@ export default function Navbar() {
                 </Button>
               )}
               <a
-                href={`https://wa.me/20${BUSINESS_PHONE.slice(1)}`}
+                href={`https://wa.me/20${BOOKING_WHATSAPP.slice(1)}`}
                 target="_blank"
                 rel="noreferrer"
               >
                 <Button variant="outline" className="w-full border-emerald-600 text-emerald-700 hover:bg-emerald-50 font-bold">
-                  تواصل عبر واتساب
+                  {lang === "ar" ? "حجز وطلب عبر واتساب" : "Booking via WhatsApp"}
                 </Button>
               </a>
             </div>

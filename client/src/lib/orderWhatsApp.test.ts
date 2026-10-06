@@ -9,8 +9,8 @@ describe("order WhatsApp message helpers", () => {
   });
 
   it("uses the verified business number when a saved support number is incomplete", () => {
-    expect(buildBusinessWhatsAppUrl("20", "مرحبا")).toBe(`https://wa.me/201118182424?text=${encodeURIComponent("مرحبا")}`);
-    expect(buildBusinessWhatsAppUrl("+20 111 818 2424", "مرحبا")).toBe(`https://wa.me/201118182424?text=${encodeURIComponent("مرحبا")}`);
+    expect(buildBusinessWhatsAppUrl("20", "مرحبا")).toBe(`https://wa.me/201041939388?text=${encodeURIComponent("مرحبا")}`);
+    expect(buildBusinessWhatsAppUrl("+20 104 193 9388", "مرحبا")).toBe(`https://wa.me/201041939388?text=${encodeURIComponent("مرحبا")}`);
   });
 
   it("builds a customer-specific status message and chat URL", () => {

@@ -2264,15 +2264,15 @@ var appRouter = router({
     get: publicProcedure.query(async () => {
       const row = await getSiteContentByKey("contact");
       if (!row) {
-        return { facebookUrl: "", instagramUrl: "", telegramUrl: "", whatsappNumber: "", whatsAppMessage: "", phone: "" };
+        return { facebookUrl: "", instagramUrl: "", telegramUrl: "", whatsappNumber: "01041939388", whatsAppMessage: "", phone: "01118182424" };
       }
       return {
         facebookUrl: row.titleAr ?? "",
         instagramUrl: row.titleEn ?? "",
         telegramUrl: row.contentAr ?? "",
-        whatsappNumber: row.contentEn ?? "",
+        whatsappNumber: row.contentEn || "01041939388",
         whatsAppMessage: row.subtitleAr ?? "",
-        phone: row.subtitleEn ?? ""
+        phone: row.subtitleEn || "01118182424"
       };
     }),
     update: adminProcedure.input(z2.object({

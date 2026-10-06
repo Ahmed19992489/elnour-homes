@@ -500,10 +500,10 @@ export default function ProductDetail() {
   };
 
   const handleWhatsApp = () => {
-    const phone = "201118182424";
+    const phone = "201041939388";
     const text = lang === "ar"
-      ? `مرحباً، أرغب في الاستفسار عن المنتج التالي:\n${product?.nameAr}\n${selectedSize ? `المقاس: ${selectedSize}\n` : ""}${selectedColor ? `اللون: ${selectedColor}\n` : ""}${isPerMeter ? `السعر: ${formatPrice(pricePerMeterValue)} ج.م للمتر` : `السعر: ${formatPrice(sizePriceValue)} ج.م`}`
-      : `Hello, I would like to inquire about this product:\n${product?.name}\n${selectedSize ? `Size: ${selectedSize}\n` : ""}${selectedColor ? `Colour: ${selectedColor}\n` : ""}${isPerMeter ? `Price: ${formatPrice(pricePerMeterValue)} EGP per meter` : `Price: ${formatPrice(sizePriceValue)} EGP`}`;
+      ? `مرحباً، أرغب في حجز / طلب المنتج التالي عبر واتساب:\n${product?.nameAr}\n${selectedSize ? `المقاس: ${selectedSize}\n` : ""}${selectedColor ? `اللون: ${selectedColor}\n` : ""}${isPerMeter ? `السعر: ${formatPrice(pricePerMeterValue)} ج.م للمتر` : `السعر: ${formatPrice(sizePriceValue)} ج.م`}`
+      : `Hello, I would like to book / order this product via WhatsApp:\n${product?.name}\n${selectedSize ? `Size: ${selectedSize}\n` : ""}${selectedColor ? `Colour: ${selectedColor}\n` : ""}${isPerMeter ? `Price: ${formatPrice(pricePerMeterValue)} EGP per meter` : `Price: ${formatPrice(sizePriceValue)} EGP`}`;
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, "_blank");
   };
 
@@ -1289,11 +1289,15 @@ export default function ProductDetail() {
               </DialogContent>
             </Dialog>
 
-            {/* Call Us */}
-            <div className="border-t pt-4">
+            {/* Support & Contact */}
+            <div className="border-t pt-4 space-y-2 text-xs">
               <a href="tel:01118182424" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
-                <Phone className="h-4 w-4" />
-                <span>{lang === "ar" ? "اتصل بنا" : "Call Us"}: 01118182424</span>
+                <Phone className="h-4 w-4 text-[#ad842f]" />
+                <span>{lang === "ar" ? "خدمة ما بعد البيع والدعم: 01118182424" : "After-Sales & Support: 01118182424"}</span>
+              </a>
+              <a href="https://wa.me/201041939388" target="_blank" rel="noreferrer" className="flex items-center gap-2 text-emerald-600 hover:text-emerald-700 font-bold transition-colors">
+                <MessageCircle className="h-4 w-4 text-[#25d366]" />
+                <span>{lang === "ar" ? "واتساب الحجز والطلبات: 01041939388" : "Booking WhatsApp: 01041939388"}</span>
               </a>
             </div>
           </div>

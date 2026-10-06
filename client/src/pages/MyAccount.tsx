@@ -3,7 +3,7 @@ import { startLogin } from "@/const";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { trpc } from "@/lib/trpc";
-import { buildBusinessWhatsAppUrl } from "@/lib/orderWhatsApp";
+import { buildAfterSalesWhatsAppUrl, buildBusinessWhatsAppUrl } from "@/lib/orderWhatsApp";
 import PublicLayout from "@/components/storefront/PublicLayout";
 import CustomerAuthDialog from "@/components/storefront/CustomerAuthDialog";
 import { Button } from "@/components/ui/button";
@@ -196,7 +196,7 @@ export default function MyAccount() {
 
   // Direct call number taken from site contact settings (phone field)
   const callNumber = (contact?.phone ?? "").replace(/[^0-9+]/g, "");
-  const supportWhatsAppUrl = buildBusinessWhatsAppUrl(contact?.whatsappNumber);
+  const supportWhatsAppUrl = buildAfterSalesWhatsAppUrl(contact?.phone || "01118182424");
 
   if (!loading && !user) {
     return (

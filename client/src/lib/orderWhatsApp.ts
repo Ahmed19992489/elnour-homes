@@ -7,8 +7,11 @@ export type OrderWhatsAppMessageInput = {
   orderUrl?: string;
 };
 
-export const DEFAULT_BUSINESS_WHATSAPP = "01118182424";
-export const DEFAULT_BUSINESS_WHATSAPP_MESSAGE = "مرحباً، أرغب في الاستفسار عن منتجات وتصاميم Elnour Home";
+export const DEFAULT_BOOKING_WHATSAPP = "01041939388";
+export const DEFAULT_AFTERSALES_PHONE = "01118182424";
+export const DEFAULT_BUSINESS_WHATSAPP = "01041939388";
+export const DEFAULT_BUSINESS_WHATSAPP_MESSAGE = "مرحباً، أرغب في حجز واستفسار عن منتجات وتصاميم Elnour Home";
+export const DEFAULT_AFTERSALES_WHATSAPP_MESSAGE = "مرحباً، أود التواصل مع خدمة ما بعد البيع والدعم بخصوص طلب في Elnour Home";
 
 const STATUS_COPY: Record<string, string> = {
   new: "تم استلام طلبك",
@@ -30,6 +33,11 @@ export function normalizeWhatsAppRecipient(phone?: string | null) {
 
 export function buildBusinessWhatsAppUrl(phone?: string | null, message = DEFAULT_BUSINESS_WHATSAPP_MESSAGE) {
   const recipient = normalizeWhatsAppRecipient(phone) || normalizeWhatsAppRecipient(DEFAULT_BUSINESS_WHATSAPP);
+  return `https://wa.me/${recipient}?text=${encodeURIComponent(message)}`;
+}
+
+export function buildAfterSalesWhatsAppUrl(phone?: string | null, message = DEFAULT_AFTERSALES_WHATSAPP_MESSAGE) {
+  const recipient = normalizeWhatsAppRecipient(phone) || normalizeWhatsAppRecipient(DEFAULT_AFTERSALES_PHONE);
   return `https://wa.me/${recipient}?text=${encodeURIComponent(message)}`;
 }
 

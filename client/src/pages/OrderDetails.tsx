@@ -6,7 +6,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { trpc } from "@/lib/trpc";
 import { parseProductImages } from "@/lib/productImages";
 import { createOrderInvoicePdf, orderInvoiceFileName } from "@/lib/orderInvoicePdf";
-import { buildBusinessWhatsAppUrl } from "@/lib/orderWhatsApp";
+import { buildAfterSalesWhatsAppUrl, buildBusinessWhatsAppUrl } from "@/lib/orderWhatsApp";
 import { playStatusUpdateAlert } from "@/lib/soundAlert";
 import PublicLayout from "@/components/storefront/PublicLayout";
 import CustomerAuthDialog from "@/components/storefront/CustomerAuthDialog";
@@ -401,7 +401,7 @@ export default function OrderDetails() {
               <CardContent className="space-y-2 text-sm"><p><span className="text-muted-foreground">{t("الاسم:", "Name:")}</span> {order.customerName}</p><p dir="ltr"><span className="text-muted-foreground">{t("الهاتف:", "Phone:")}</span> {order.customerPhone}</p>{order.customerAddress ? <p><span className="text-muted-foreground">{t("العنوان:", "Address:")}</span> {order.customerAddress}</p> : null}</CardContent>
             </Card>
 
-            <Card className="border-amber-200 bg-amber-50/50"><CardContent className="pt-6"><p className="font-semibold">{t("هل تحتاج إلى مساعدة؟", "Need help with this order?")}</p><p className="mt-1 text-sm text-muted-foreground">{t("تواصل معنا واذكر رقم الطلب.", "Contact us and mention your order number.")}</p><div className="mt-4 flex flex-wrap gap-2">{callNumber ? <a href={`tel:${callNumber}`}><Button size="sm" variant="outline" className="gap-2"><Phone className="h-4 w-4" />{t("اتصل", "Call")}</Button></a> : null}<Button size="sm" className="gap-2 bg-[#26231e] text-white hover:bg-[#ad842f]" onClick={() => window.open(buildBusinessWhatsAppUrl(contact?.whatsappNumber, `${t("مرحبًا، أحتاج مساعدة بخصوص الطلب رقم", "Hello, I need help with order")} #${order.id}`), "_blank", "noopener,noreferrer")}><MessageCircle className="h-4 w-4" />{t("واتساب", "WhatsApp")}</Button></div></CardContent></Card>
+            <Card className="border-amber-200 bg-amber-50/50"><CardContent className="pt-6"><p className="font-semibold">{t("هل تحتاج إلى مساعدة أو خدمة ما بعد البيع؟", "Need help or after-sales service for this order?")}</p><p className="mt-1 text-sm text-muted-foreground">{t("تواصل مع فريق خدمة ما بعد البيع والدعم واذكر رقم الطلب.", "Contact after-sales customer support and mention your order number.")}</p><div className="mt-4 flex flex-wrap gap-2">{callNumber ? <a href={`tel:${callNumber}`}><Button size="sm" variant="outline" className="gap-2"><Phone className="h-4 w-4" />{t("اتصل", "Call")}</Button></a> : null}<Button size="sm" className="gap-2 bg-[#26231e] text-white hover:bg-[#ad842f]" onClick={() => window.open(buildAfterSalesWhatsAppUrl(contact?.phone || "01118182424", `${t("مرحبًا، أحتاج مساعدة من خدمة ما بعد البيع بخصوص الطلب رقم", "Hello, I need after-sales support for order")} #${order.id}`), "_blank", "noopener,noreferrer")}><MessageCircle className="h-4 w-4 text-emerald-400" />{t("واتساب خدمة ما بعد البيع", "After-Sales WhatsApp")}</Button></div></CardContent></Card>
           </div>
         </div>
       </main>

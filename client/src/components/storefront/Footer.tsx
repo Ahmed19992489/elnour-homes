@@ -3,7 +3,8 @@ import { Link } from "wouter";
 import { Sparkles, Phone, Mail, MapPin, MessageCircle, ShieldCheck, Truck, Clock, Facebook } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 
-const BUSINESS_PHONE = "01118182424";
+const BOOKING_WHATSAPP = "01041939388";
+const AFTERSALES_PHONE = "01118182424";
 const SECONDARY_PHONE = "01114323218";
 const BUSINESS_EMAIL = "info@elnourhomes.com";
 
@@ -80,11 +81,11 @@ export default function Footer() {
             </p>
             <div className="flex items-center gap-3 pt-2">
               <a
-                href={`https://wa.me/20${BUSINESS_PHONE.slice(1)}`}
+                href={`https://wa.me/20${BOOKING_WHATSAPP.slice(1)}`}
                 target="_blank"
                 rel="noreferrer"
-                className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#2e2a23] text-[#d5af58] hover:bg-[#d5af58] hover:text-[#24211d] transition-all"
-                title="WhatsApp"
+                className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#2e2a23] text-emerald-400 hover:bg-[#25d366] hover:text-white transition-all"
+                title="WhatsApp Booking"
               >
                 <MessageCircle className="h-5 w-5" />
               </a>
@@ -98,9 +99,9 @@ export default function Footer() {
                 <Facebook className="h-5 w-5" />
               </a>
               <a
-                href={`tel:+20${BUSINESS_PHONE.slice(1)}`}
+                href={`tel:+20${AFTERSALES_PHONE.slice(1)}`}
                 className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#2e2a23] text-[#d5af58] hover:bg-[#d5af58] hover:text-[#24211d] transition-all"
-                title="Phone"
+                title="After-Sales Phone"
               >
                 <Phone className="h-5 w-5" />
               </a>
@@ -143,13 +144,22 @@ export default function Footer() {
             <h4 className="font-bold text-white mb-4 text-base">{t("معلومات التواصل", "Contact Info")}</h4>
             <ul className="space-y-3 text-sm text-[#b5aba0]">
               <li className="flex items-start gap-2.5">
-                <Phone className="h-4 w-4 text-[#d5af58] shrink-0 mt-1" />
+                <MessageCircle className="h-4 w-4 text-emerald-400 shrink-0 mt-1" />
                 <div>
-                  <span className="block font-semibold text-white">{t("الهاتف والواتساب الموحد:", "Phone & WhatsApp:")}</span>
-                  <a href={`tel:+20${BUSINESS_PHONE.slice(1)}`} className="text-[#d5af58] font-bold dir-ltr block" dir="ltr">
-                    +20 {BUSINESS_PHONE.slice(1, 4)} {BUSINESS_PHONE.slice(4, 7)} {BUSINESS_PHONE.slice(7)}
+                  <span className="block font-semibold text-white">{t("واتساب الحجز والطلبات:", "Booking WhatsApp:")}</span>
+                  <a href={`https://wa.me/20${BOOKING_WHATSAPP.slice(1)}`} target="_blank" rel="noreferrer" className="text-emerald-400 hover:text-emerald-300 font-bold dir-ltr block" dir="ltr">
+                    +20 {BOOKING_WHATSAPP.slice(1, 4)} {BOOKING_WHATSAPP.slice(4, 7)} {BOOKING_WHATSAPP.slice(7)}
                   </a>
-                  <a href={`tel:+20${SECONDARY_PHONE.slice(1)}`} className="text-[#d5af58] font-bold dir-ltr block text-xs mt-1" dir="ltr">
+                </div>
+              </li>
+              <li className="flex items-start gap-2.5">
+                <ShieldCheck className="h-4 w-4 text-[#d5af58] shrink-0 mt-1" />
+                <div>
+                  <span className="block font-semibold text-white">{t("خدمة ما بعد البيع والدعم:", "After-Sales & Support:")}</span>
+                  <a href={`tel:+20${AFTERSALES_PHONE.slice(1)}`} className="text-[#d5af58] font-bold dir-ltr block" dir="ltr">
+                    +20 {AFTERSALES_PHONE.slice(1, 4)} {AFTERSALES_PHONE.slice(4, 7)} {AFTERSALES_PHONE.slice(7)}
+                  </a>
+                  <a href={`tel:+20${SECONDARY_PHONE.slice(1)}`} className="text-[#d5af58]/80 hover:text-[#d5af58] font-semibold dir-ltr block text-xs mt-0.5" dir="ltr">
                     +20 {SECONDARY_PHONE.slice(1, 4)} {SECONDARY_PHONE.slice(4, 7)} {SECONDARY_PHONE.slice(7)}
                   </a>
                 </div>

@@ -13,8 +13,9 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import CustomerAuthDialog from "./CustomerAuthDialog";
 
-const DEFAULT_WHATSAPP = "01118182424";
-const DEFAULT_WHATSAPP_MESSAGE = "مرحباً، أرغب في الاستفسار عن أعمال Elnour Home";
+const DEFAULT_WHATSAPP = "01041939388";
+const DEFAULT_SUPPORT_PHONE = "01118182424";
+const DEFAULT_WHATSAPP_MESSAGE = "مرحباً، أرغب في حجز واستفسار عن أعمال Elnour Home";
 const DEFAULT_FACEBOOK = "https://www.facebook.com/Elnour.home";
 
 function buildWhatsAppLink(number: string, message: string) {
@@ -313,9 +314,16 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
             </div>
           </div>
           <div>
-            <p className="text-sm font-bold text-[#d5af58]">{lang === "ar" ? "تواصل" : "Contact"}</p>
+            <p className="text-sm font-bold text-[#d5af58]">{lang === "ar" ? "تواصل وخدمة العملاء" : "Contact & Support"}</p>
             <div className="mt-3 flex flex-col gap-2 text-sm text-[#d6d0c7]">
-              <a href={WHATSAPP_LINK} target="_blank" rel="noreferrer" className="flex items-center gap-2 hover:text-white">{copy.whatsapp}</a>
+              <a href={WHATSAPP_LINK} target="_blank" rel="noreferrer" className="flex items-center gap-2 hover:text-[#d5af58] transition-colors">
+                <MessageCircle className="h-4 w-4 text-emerald-500 shrink-0" />
+                <span>{lang === "ar" ? "حجز وطلب واتساب: 01041939388" : "Booking WhatsApp: 01041939388"}</span>
+              </a>
+              <a href={`tel:${contact?.phone || DEFAULT_SUPPORT_PHONE}`} className="flex items-center gap-2 hover:text-[#d5af58] transition-colors">
+                <ShieldCheck className="h-4 w-4 text-[#d5af58] shrink-0" />
+                <span>{lang === "ar" ? `خدمة ما بعد البيع: ${contact?.phone || DEFAULT_SUPPORT_PHONE}` : `After-Sales: ${contact?.phone || DEFAULT_SUPPORT_PHONE}`}</span>
+              </a>
               {FACEBOOK_LINK ? <a href={FACEBOOK_LINK} target="_blank" rel="noreferrer" className="flex items-center gap-2 hover:text-white">{copy.facebook}</a> : null}
               {contact?.instagramUrl ? (
                 <a href={contact.instagramUrl} target="_blank" rel="noreferrer" className="flex items-center gap-2 hover:text-white" aria-label="Instagram">
@@ -329,7 +337,6 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
                   Telegram
                 </a>
               ) : null}
-              {contact?.phone ? <a href={`tel:${contact.phone}`} className="flex items-center gap-2 hover:text-white" dir="ltr">{contact.phone}</a> : null}
             </div>
           </div>
         </div>
