@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, ArrowRight, Calculator, Check, Heart, MessageCircle, Palette, Ruler, ShoppingCart, Phone, Star, Globe, ShieldCheck, Gem, Paintbrush, Truck, BellRing, Tag, ListChecks, RotateCcw, Plus, Minus } from "lucide-react";
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useCart } from "@/contexts/CartContext";
