@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Plus, Pencil, Trash2, Image, Upload, X, Eye, EyeOff } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, Image, Upload, X, Eye, EyeOff, Truck } from "lucide-react";
 import { useEffect, useMemo, useState, useRef } from "react";
 import { SQM_PRICE_EGP } from "@shared/const";
 import { toast } from "sonner";
@@ -87,6 +87,8 @@ export default function AdminProducts() {
     description: "",
     price: "",
     originalPrice: "",
+    shippingCost: "0",
+    isFreeShipping: false,
     sizes: "",
     colors: "",
     sizeOptions: "",
@@ -337,6 +339,8 @@ export default function AdminProducts() {
       description: "",
       price: "",
       originalPrice: "",
+      shippingCost: "0",
+      isFreeShipping: false,
       sizes: "",
       colors: "",
       sizeOptions: "",
@@ -424,6 +428,8 @@ export default function AdminProducts() {
       description: form.description?.trim() || undefined,
       price: cleanPrice,
       originalPrice: origPrice && origPrice > 0 ? origPrice : null,
+      shippingCost: form.isFreeShipping ? 0 : cleanNumber(form.shippingCost),
+      isFreeShipping: Boolean(form.isFreeShipping),
       sizes: form.sizes || undefined,
       colors: form.colors || undefined,
       sizeOptions: serializeSizeOptions(sizeRows) || undefined,
@@ -452,6 +458,8 @@ export default function AdminProducts() {
       description: product.description || "",
       price: String(product.price ?? ""),
       originalPrice: (product as any).originalPrice ? String((product as any).originalPrice) : "",
+      shippingCost: String((product as any).shippingCost ?? "0"),
+      isFreeShipping: Boolean((product as any).isFreeShipping),
       sizes: product.sizes || "",
       colors: product.colors || "",
       sizeOptions: product.sizeOptions || "",
@@ -606,6 +614,69 @@ export default function AdminProducts() {
                   }
                   return null;
                 })()}
+
+                {/* إعدادات الشحن والتوصيل للمنتج */}
+                <div className="rounded-xl border border-amber-200/80 bg-gradient-to-r from-amber-50/40 to-[#faf8f5] p-3.5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Truck className="h-4 w-4 text-[#ad842f]" />
+                      <Label className="font-bold text-sm text-[#24211d]">إعدادات الشحن والتوصيل لهذا المنتج</Label>
+                    </div>
+                    {form.isFreeShipping ? (
+                      <Badge className="bg-emerald-600 text-white font-bold hover:bg-emerald-700">شحن مجاني 🚚</Badge>
+                    ) : (
+                      <span className="text-xs text-[#8a806f] font-semibold">
+                        {cleanNumber(form.shippingCost) > 0 ? `الشحن: ${cleanNumber(form.shippingCost)} ج.م` : "شحن مجاني"}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between rounded-lg border bg-white p-2.5 shadow-sm">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="product-free-shipping" className="text-xs font-bold cursor-pointer text-[#24211d]">
+                        شحن مجاني لهذا المنتج (Free Shipping)
+                      </Label>
+                      <p className="text-[11px] text-muted-foreground">
+                        عند تفعيل هذا الخيار، سيظهر للعميل شارة «🚚 شحن مجاني» ولن تضاف أي قيمة شحن على الطلب.
+                      </p>
+                    </div>
+                    <Switch
+                      id="product-free-shipping"
+                      checked={form.isFreeShipping}
+                      onCheckedChange={(val) => setForm({ ...form, isFreeShipping: val })}
+                    />
+                  </div>
+
+                  {!form.isFreeShipping ? (
+                    <div className="space-y-2 pt-1">
+                      <Label className="flex items-center justify-between text-xs">
+                        <span className="font-semibold text-slate-700">قيمة مصاريف الشحن (ج.م) *</span>
+                        <span className="text-[11px] text-muted-foreground font-normal">تضاف تلقائيًا إلى إجمالي سعر المنتج عند تأكيد الطلب</span>
+                      </Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={form.shippingCost}
+                        onChange={(e) => setForm({ ...form, shippingCost: e.target.value })}
+                        placeholder="مثال: 50 أو 75 أو 100"
+                        className="bg-white"
+                      />
+                      <div className="flex items-center gap-1.5 pt-0.5">
+                        <span className="text-[11px] text-muted-foreground">خيارات سريعة:</span>
+                        {[50, 75, 100, 150].map((cost) => (
+                          <button
+                            type="button"
+                            key={cost}
+                            onClick={() => setForm({ ...form, shippingCost: String(cost) })}
+                            className="text-[11px] font-bold px-2 py-0.5 rounded border border-amber-200 bg-white text-[#ad842f] hover:bg-amber-50"
+                          >
+                            {cost} ج.م
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -930,6 +1001,7 @@ export default function AdminProducts() {
                       <TableHead>الاسم</TableHead>
                       <TableHead>الفئة</TableHead>
                       <TableHead>السعر</TableHead>
+                      <TableHead>الشحن</TableHead>
                       <TableHead>الحالة</TableHead>
                       <TableHead>إجراءات</TableHead>
                     </TableRow>
@@ -937,6 +1009,8 @@ export default function AdminProducts() {
                   <TableBody>
                     {products.map((product) => {
                       const images = parseProductImages(product.images);
+                      const isFree = Boolean((product as any).isFreeShipping);
+                      const shipCost = cleanNumber((product as any).shippingCost);
                       return (
                         <TableRow key={product.id}>
                           <TableCell className="font-medium">{product.id}</TableCell>
@@ -968,6 +1042,22 @@ export default function AdminProducts() {
                                 </div>
                               )}
                             </div>
+                          </TableCell>
+                          <TableCell>
+                            {isFree ? (
+                              <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300 font-semibold shadow-none hover:bg-emerald-200">
+                                شحن مجاني 🚚
+                              </Badge>
+                            ) : shipCost > 0 ? (
+                              <span className="text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full inline-flex items-center gap-1 shadow-sm">
+                                <Truck className="h-3 w-3 text-[#ad842f]" />
+                                {shipCost} ج.م
+                              </span>
+                            ) : (
+                              <Badge variant="outline" className="text-xs text-emerald-700 border-emerald-200 bg-emerald-50/50">
+                                شحن مجاني
+                              </Badge>
+                            )}
                           </TableCell>
                           <TableCell>
                             <Badge variant={product.isActive === "yes" ? "default" : "secondary"}>

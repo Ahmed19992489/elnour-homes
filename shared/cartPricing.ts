@@ -67,17 +67,53 @@ export function computeCartItemPrice(
   return basePrice;
 }
 
+function normalizeText(text: string): string {
+  return text
+    .trim()
+    .toLowerCase()
+    .replace(/[أإآ]/g, "ا")
+    .replace(/ة/g, "ه")
+    .replace(/ى/g, "ي")
+    .replace(/[\s\-_]+/g, "");
+}
+
 export function isOptionAvailable(
   values: string | null | undefined,
   jsonOptions: string | null | undefined,
   key: "labelAr" | "labelEn",
   selected: string | undefined,
 ): boolean {
-  if (!selected) return true;
+  if (!selected || !selected.trim()) return true;
   const legacy = splitOptions(values);
-  const json = parseJsonOptions<Record<string, unknown>>(jsonOptions);
-  const normalized = selected.trim().toLocaleLowerCase();
-  if (legacy.some((v) => v.toLocaleLowerCase() === normalized)) return true;
-  if (json.some((opt) => String(opt[key] ?? "").toLocaleLowerCase() === normalized)) return true;
+  const json = parseJsonOptions<Record<string, unknown> | string>(jsonOptions);
+
+  // If this product does not have any options configured, allow the selection without blocking
+  if (legacy.length === 0 && json.length === 0) return true;
+
+  const normSelected = normalizeText(selected);
+
+  if (legacy.some((v) => {
+    const nv = normalizeText(v);
+    return nv === normSelected || nv.includes(normSelected) || normSelected.includes(nv);
+  })) {
+    return true;
+  }
+
+  if (json.some((opt) => {
+    if (typeof opt === "string") {
+      const nv = normalizeText(opt);
+      return nv === normSelected || nv.includes(normSelected) || normSelected.includes(nv);
+    }
+    if (typeof opt === "object" && opt !== null) {
+      const val = String(opt[key] ?? opt.labelAr ?? opt.labelEn ?? (opt as any).name ?? "").trim();
+      if (!val) return false;
+      const nv = normalizeText(val);
+      return nv === normSelected || nv.includes(normSelected) || normSelected.includes(nv);
+    }
+    return false;
+  })) {
+    return true;
+  }
+
   return false;
 }

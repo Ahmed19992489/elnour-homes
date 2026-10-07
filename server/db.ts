@@ -264,17 +264,20 @@ export async function upsertSetting(key: string, value: string | null) {
 
 // ===== PRODUCTS =====
 
-let _productsOriginalPriceChecked = false;
+let _productsColumnsChecked = false;
 export async function ensureProductColumns(): Promise<void> {
-  if (_productsOriginalPriceChecked) return;
+  if (_productsColumnsChecked) return;
   const url = process.env.DATABASE_URL || ENV.databaseUrl;
   if (!url) return;
   try {
     const rawSql = neon(url);
     await rawSql`ALTER TABLE products ADD COLUMN IF NOT EXISTS original_price VARCHAR(50);`;
-    _productsOriginalPriceChecked = true;
+    await rawSql`ALTER TABLE products ADD COLUMN IF NOT EXISTS shipping_cost VARCHAR(50) DEFAULT '0';`;
+    await rawSql`ALTER TABLE products ADD COLUMN IF NOT EXISTS is_free_shipping BOOLEAN DEFAULT false;`;
+    await rawSql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_cost VARCHAR(50) DEFAULT '0';`;
+    _productsColumnsChecked = true;
   } catch (err) {
-    console.error("[Database] Error ensuring original_price column:", err);
+    console.error("[Database] Error ensuring product/order columns:", err);
   }
 }
 

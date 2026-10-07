@@ -131,18 +131,48 @@ function parseSizeOptions(value?: string | null): SizeOption[] {
   }
 }
 
+function colorSwatch(name?: string) {
+  if (!name) return "#d7c6a4";
+  const normalized = name.trim().toLocaleLowerCase();
+  if (/(ذهبي|gold)/.test(normalized)) return "#c7a256";
+  if (/(فضي|silver)/.test(normalized)) return "#b7b8b9";
+  if (/(أسود|اسود|black)/.test(normalized)) return "#242424";
+  if (/(أبيض|ابيض|white)/.test(normalized)) return "#f7f6f2";
+  if (/(برونزي|bronze|نحاسي|copper)/.test(normalized)) return "#9a6544";
+  if (/(رمادي|gray|grey)/.test(normalized)) return "#737373";
+  return "#d7c6a4";
+}
+
 function parseColorOptions(value?: string | null): ColorOption[] {
   try {
     if (!value) return [];
     const parsed = JSON.parse(value);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter((opt) => opt && opt.labelAr).map((opt) => ({
-      labelAr: String(opt.labelAr ?? ""),
-      labelEn: String(opt.labelEn ?? opt.labelAr ?? ""),
-      hex: String(opt.hex ?? colorSwatch(opt.labelAr)),
-    }));
+    return parsed
+      .map((opt) => {
+        if (typeof opt === "string") {
+          return {
+            labelAr: opt,
+            labelEn: opt,
+            hex: colorSwatch(opt),
+          };
+        }
+        if (typeof opt === "object" && opt !== null) {
+          const labelAr = String(opt.labelAr ?? opt.name ?? opt.label ?? "").trim();
+          const labelEn = String(opt.labelEn ?? labelAr).trim();
+          const hex = String(opt.hex || colorSwatch(labelAr));
+          if (!labelAr) return null;
+          return { labelAr, labelEn, hex };
+        }
+        return null;
+      })
+      .filter((opt): opt is ColorOption => opt !== null);
   } catch {
-    return [];
+    return splitOptions(value).map((opt) => ({
+      labelAr: opt,
+      labelEn: opt,
+      hex: colorSwatch(opt),
+    }));
   }
 }
 
@@ -167,17 +197,6 @@ function computedSquareMeterPrice(labelAr: string, sqmPrice: number): number | n
 
 function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-}
-
-function colorSwatch(name: string) {
-  const normalized = name.trim().toLocaleLowerCase();
-  if (/(ذهبي|gold)/.test(normalized)) return "#c7a256";
-  if (/(فضي|silver)/.test(normalized)) return "#b7b8b9";
-  if (/(أسود|اسود|black)/.test(normalized)) return "#242424";
-  if (/(أبيض|ابيض|white)/.test(normalized)) return "#f7f6f2";
-  if (/(برونزي|bronze|نحاسي|copper)/.test(normalized)) return "#9a6544";
-  if (/(رمادي|gray|grey)/.test(normalized)) return "#737373";
-  return "#d7c6a4";
 }
 
 export default function ProductDetail() {
@@ -209,6 +228,10 @@ export default function ProductDetail() {
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [selectedSize, setSelectedSize] = useState("");
   const [selectedColor, setSelectedColor] = useState("");
+  const [sizeErrorHighlight, setSizeErrorHighlight] = useState(false);
+  const [colorErrorHighlight, setColorErrorHighlight] = useState(false);
+  const sizeSectionRef = useRef<HTMLDivElement>(null);
+  const colorSectionRef = useRef<HTMLDivElement>(null);
   const [directPaymentMethod, setDirectPaymentMethod] = useState<"cod" | "instapay" | "wallet">("cod");
   const [directQuantity, setDirectQuantity] = useState(1);
   const [orderForm, setOrderForm] = useState({
@@ -336,8 +359,13 @@ export default function ProductDetail() {
     return parseFloat(opt.price);
   }, [sizeOptions, selectedSize, priceValue]);
 
+  const rawShippingCost = (product as any)?.shippingCost;
+  const isFreeShipping = Boolean((product as any)?.isFreeShipping || rawShippingCost === "0" || !rawShippingCost);
+  const shippingAmount = (product as any)?.isFreeShipping ? 0 : (parseFloat(String(rawShippingCost || "0")) || 0);
+
   const activeTotal = isPerMeter ? pricePerMeterValue : sizePriceValue;
   const finalTotal = useMemo(() => Math.max(0, activeTotal - couponDiscount), [activeTotal, couponDiscount]);
+  const directOrderTotal = useMemo(() => Math.max(0, (finalTotal * directQuantity) + shippingAmount), [finalTotal, directQuantity, shippingAmount]);
 
   const productJsonLd = product ? {
     "@context": "https://schema.org",
@@ -418,26 +446,53 @@ export default function ProductDetail() {
 
   useEffect(() => {
     setSelectedImage(0);
+    setSizeErrorHighlight(false);
+    setColorErrorHighlight(false);
     if (product) {
       const opts = parseSizeOptions(product.sizeOptions);
-      if (opts.length > 0) {
+      const sz = splitOptions(product.sizes);
+      // Auto-select only if there's strictly 1 option; otherwise require user choice
+      if (opts.length === 1) {
         setSelectedSize(opts[0].labelAr);
+      } else if (opts.length === 0 && sz.length === 1) {
+        setSelectedSize(sz[0]);
       } else {
-        const sz = splitOptions(product.sizes);
-        setSelectedSize(sz[0] || "");
+        setSelectedSize("");
       }
+
       const copts = parseColorOptions(product.colorOptions);
-      if (copts.length > 0) {
+      const clr = splitOptions((product as any)?.colors);
+      if (copts.length === 1) {
         setSelectedColor(copts[0].labelAr);
+      } else if (copts.length === 0 && clr.length === 1) {
+        setSelectedColor(clr[0]);
       } else {
-        const clr = splitOptions((product as any)?.colors);
-        setSelectedColor(clr[0] || "");
+        setSelectedColor("");
       }
     } else {
       setSelectedSize("");
       setSelectedColor("");
     }
   }, [id, product]);
+
+  const validateVariantSelection = (): boolean => {
+    const hasSizes = sizeOptions.length > 0 || sizes.length > 0;
+    const hasColors = colorOptions.length > 0 || colors.length > 0;
+
+    if (hasSizes && !selectedSize) {
+      setSizeErrorHighlight(true);
+      sizeSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      toast.error(lang === "ar" ? "يرجى اختيار المقاس المطلوب أولاً لمتابعة الطلب" : "Please select a size first to proceed");
+      return false;
+    }
+    if (hasColors && !selectedColor) {
+      setColorErrorHighlight(true);
+      colorSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      toast.error(lang === "ar" ? "يرجى اختيار لون الاستيل المطلوب أولاً لمتابعة الطلب" : "Please select a steel colour first to proceed");
+      return false;
+    }
+    return true;
+  };
 
   const handleOrder = (e: React.FormEvent) => {
     e.preventDefault();
@@ -454,12 +509,7 @@ export default function ProductDetail() {
       return;
     }
 
-    if (sizes.length && !selectedSize) {
-      toast.error(lang === "ar" ? "يرجى اختيار المقاس أولاً" : "Please select a size first");
-      return;
-    }
-    if (colors.length && !selectedColor) {
-      toast.error(lang === "ar" ? "يرجى اختيار اللون أولاً" : "Please select a colour first");
+    if (!validateVariantSelection()) {
       return;
     }
 
@@ -471,17 +521,21 @@ export default function ProductDetail() {
 
     const orderQty = Math.max(1, directQuantity);
     const qtyNote = orderQty > 1 ? (lang === "ar" ? `الكمية: ${orderQty}` : `Quantity: ${orderQty}`) : "";
-    const calcOrderTotal = isPerMeter ? undefined : Math.max(0, (finalTotal * orderQty));
+    const calcOrderTotal = isPerMeter ? undefined : directOrderTotal;
 
     createOrder.mutate({
       customerName: orderForm.customerName.trim(),
       customerPhone: cleanPhone,
       customerEmail,
       customerAddress: orderForm.customerAddress.trim() || undefined,
+      shippingCost: shippingAmount,
       message: [
         orderForm.message.trim(),
         `${lang === "ar" ? "طريقة الدفع" : "Payment Method"}: ${paymentLabel}`,
         qtyNote,
+        shippingAmount > 0
+          ? `${lang === "ar" ? "الشحن" : "Shipping"}: ${formatPrice(shippingAmount)} ${currency}`
+          : (lang === "ar" ? "الشحن: مجاني" : "Shipping: Free"),
         isPerMeter ? `تسعير بالمتر: ${formatPrice(pricePerMeterValue)} ${currency}/م` : "",
       ].filter(Boolean).join(" | ").trim() || undefined,
       productId: product?.id,
@@ -500,10 +554,18 @@ export default function ProductDetail() {
   };
 
   const handleWhatsApp = () => {
+    if (!validateVariantSelection()) return;
     const phone = "201041939388";
+    const shippingText = isFreeShipping
+      ? (lang === "ar" ? "الشحن: مجاني 🚚" : "Shipping: Free 🚚")
+      : (lang === "ar" ? `قيمة الشحن: ${formatPrice(shippingAmount)} ج.م` : `Shipping: ${formatPrice(shippingAmount)} EGP`);
+    const totalPriceText = isPerMeter
+      ? (lang === "ar" ? `السعر: ${formatPrice(pricePerMeterValue)} ج.م للمتر` : `Price: ${formatPrice(pricePerMeterValue)} EGP per meter`)
+      : (lang === "ar" ? `الإجمالي شامل الشحن: ${formatPrice(sizePriceValue + shippingAmount)} ج.م` : `Total including shipping: ${formatPrice(sizePriceValue + shippingAmount)} EGP`);
+
     const text = lang === "ar"
-      ? `مرحباً، أرغب في حجز / طلب المنتج التالي عبر واتساب:\n${product?.nameAr}\n${selectedSize ? `المقاس: ${selectedSize}\n` : ""}${selectedColor ? `اللون: ${selectedColor}\n` : ""}${isPerMeter ? `السعر: ${formatPrice(pricePerMeterValue)} ج.م للمتر` : `السعر: ${formatPrice(sizePriceValue)} ج.م`}`
-      : `Hello, I would like to book / order this product via WhatsApp:\n${product?.name}\n${selectedSize ? `Size: ${selectedSize}\n` : ""}${selectedColor ? `Colour: ${selectedColor}\n` : ""}${isPerMeter ? `Price: ${formatPrice(pricePerMeterValue)} EGP per meter` : `Price: ${formatPrice(sizePriceValue)} EGP`}`;
+      ? `مرحباً، أرغب في حجز / طلب المنتج التالي عبر واتساب:\n${product?.nameAr}\n${selectedSize ? `المقاس: ${selectedSize}\n` : ""}${selectedColor ? `اللون: ${selectedColor}\n` : ""}${shippingText}\n${totalPriceText}`
+      : `Hello, I would like to book / order this product via WhatsApp:\n${product?.name}\n${selectedSize ? `Size: ${selectedSize}\n` : ""}${selectedColor ? `Colour: ${selectedColor}\n` : ""}${shippingText}\n${totalPriceText}`;
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, "_blank");
   };
 
@@ -700,9 +762,17 @@ export default function ProductDetail() {
                     )}</span>
                   </div>
                 </div>
-                <span className="text-xs font-bold text-[#25d366] bg-green-50 px-2.5 py-1 rounded-full border border-green-200">
-                  {lang === "ar" ? "شحن ومعاينة متوفرة" : "Delivery Available"}
-                </span>
+                {isFreeShipping ? (
+                  <span className="text-xs font-black text-emerald-800 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-300 inline-flex items-center gap-1.5 shadow-sm">
+                    <Truck className="h-3.5 w-3.5 text-emerald-600" />
+                    {lang === "ar" ? "🚚 شحن مجاني" : "🚚 Free Shipping"}
+                  </span>
+                ) : (
+                  <span className="text-xs font-bold text-amber-900 bg-amber-50 px-3 py-1 rounded-full border border-amber-300 inline-flex items-center gap-1.5 shadow-sm">
+                    <Truck className="h-3.5 w-3.5 text-[#ad842f]" />
+                    {lang === "ar" ? `مصاريف الشحن: ${formatPrice(shippingAmount)} ${currency}` : `Shipping: ${formatPrice(shippingAmount)} ${currency}`}
+                  </span>
+                )}
               </div>
               {(() => {
                 const sqm = selectedSize ? computedSquareMeterPrice(selectedSize, sqmPrice) : null;
@@ -723,16 +793,28 @@ export default function ProductDetail() {
 
             {/* 1. Size Options (3 Sizes) */}
             {sizeOptions.length > 0 ? (
-              <div className="space-y-2.5 rounded-2xl border border-[#e3dbc9] bg-[#fcfbf7] p-3.5">
+              <div
+                ref={sizeSectionRef}
+                className={`space-y-2.5 rounded-2xl border p-3.5 transition-all duration-300 ${
+                  sizeErrorHighlight
+                    ? "border-amber-500 bg-amber-50/60 ring-2 ring-amber-400/80 shadow-md animate-pulse"
+                    : "border-[#e3dbc9] bg-[#fcfbf7]"
+                }`}
+              >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Ruler className="h-4 w-4 text-[#ad842f]" />
-                    <h3 className="font-bold text-sm text-[#24211d]">{lang === "ar" ? "اختر المقاس المطلوب" : "Choose Size"}</h3>
+                    <h3 className="font-bold text-sm text-[#24211d]">{lang === "ar" ? "اختر المقاس المطلوب *" : "Choose Size *"}</h3>
                   </div>
                   <span className="text-[11px] font-bold text-[#8a806f] bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
                     {lang === "ar" ? `${sizeOptions.length} مقاسات` : `${sizeOptions.length} sizes`}
                   </span>
                 </div>
+                {sizeErrorHighlight && (
+                  <p className="text-xs font-bold text-amber-800 bg-amber-100/80 p-2 rounded-lg border border-amber-300 flex items-center gap-1.5">
+                    ⚠️ {lang === "ar" ? "يرجى تحديد المقاس المناسب أولاً لمتابعة الطلب" : "Please select a size first"}
+                  </p>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   {sizeOptions.map((opt) => {
                     const label = lang === "ar" ? opt.labelAr : opt.labelEn;
@@ -742,7 +824,10 @@ export default function ProductDetail() {
                       <button
                         type="button"
                         key={opt.labelAr}
-                        onClick={() => setSelectedSize(opt.labelAr)}
+                        onClick={() => {
+                          setSelectedSize(opt.labelAr);
+                          setSizeErrorHighlight(false);
+                        }}
                         aria-pressed={isSelected}
                         className={`flex flex-col items-center justify-center p-2.5 rounded-xl border text-center transition-all ${
                           isSelected
@@ -763,17 +848,32 @@ export default function ProductDetail() {
                 </div>
               </div>
             ) : sizes.length > 0 ? (
-              <div className="space-y-2.5 rounded-2xl border border-[#e3dbc9] bg-[#fcfbf7] p-3.5">
+              <div
+                ref={sizeSectionRef}
+                className={`space-y-2.5 rounded-2xl border p-3.5 transition-all duration-300 ${
+                  sizeErrorHighlight
+                    ? "border-amber-500 bg-amber-50/60 ring-2 ring-amber-400/80 shadow-md animate-pulse"
+                    : "border-[#e3dbc9] bg-[#fcfbf7]"
+                }`}
+              >
                 <div className="flex items-center gap-2">
                   <Ruler className="h-4 w-4 text-[#ad842f]" />
-                  <h3 className="font-bold text-sm text-[#24211d]">{lang === "ar" ? "اختر المقاس" : "Choose Size"}</h3>
+                  <h3 className="font-bold text-sm text-[#24211d]">{lang === "ar" ? "اختر المقاس *" : "Choose Size *"}</h3>
                 </div>
+                {sizeErrorHighlight && (
+                  <p className="text-xs font-bold text-amber-800 bg-amber-100/80 p-2 rounded-lg border border-amber-300 flex items-center gap-1.5">
+                    ⚠️ {lang === "ar" ? "يرجى تحديد المقاس المناسب أولاً لمتابعة الطلب" : "Please select a size first"}
+                  </p>
+                )}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   {sizes.map((size) => (
                     <button
                       type="button"
                       key={size}
-                      onClick={() => setSelectedSize(size)}
+                      onClick={() => {
+                        setSelectedSize(size);
+                        setSizeErrorHighlight(false);
+                      }}
                       aria-pressed={selectedSize === size}
                       className={`flex min-h-11 flex-col items-center justify-center p-2 rounded-xl border text-center transition ${
                         selectedSize === size
@@ -790,11 +890,18 @@ export default function ProductDetail() {
 
             {/* 2. Color Options (3 Colors including Silver) */}
             {(colorOptions.length > 0 || colors.length > 0) && (
-              <div className="space-y-2.5 rounded-2xl border border-[#e3dbc9] bg-[#fcfbf7] p-3.5">
+              <div
+                ref={colorSectionRef}
+                className={`space-y-2.5 rounded-2xl border p-3.5 transition-all duration-300 ${
+                  colorErrorHighlight
+                    ? "border-amber-500 bg-amber-50/60 ring-2 ring-amber-400/80 shadow-md animate-pulse"
+                    : "border-[#e3dbc9] bg-[#fcfbf7]"
+                }`}
+              >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Palette className="h-4 w-4 text-[#ad842f]" />
-                    <h3 className="font-bold text-sm text-[#24211d]">{lang === "ar" ? "اختر لون الاستيل" : "Choose Steel Colour"}</h3>
+                    <h3 className="font-bold text-sm text-[#24211d]">{lang === "ar" ? "اختر لون الاستيل *" : "Choose Steel Colour *"}</h3>
                   </div>
                   {selectedColor && (
                     <span className="text-[11px] font-bold text-[#ad842f]">
@@ -802,6 +909,11 @@ export default function ProductDetail() {
                     </span>
                   )}
                 </div>
+                {colorErrorHighlight && (
+                  <p className="text-xs font-bold text-amber-800 bg-amber-100/80 p-2 rounded-lg border border-amber-300 flex items-center gap-1.5">
+                    ⚠️ {lang === "ar" ? "يرجى تحديد لون الاستيل أولاً لمتابعة الطلب" : "Please select a steel colour first"}
+                  </p>
+                )}
                 <div className="grid grid-cols-3 gap-2">
                   {colorOptions.length > 0 ? (
                     colorOptions.map((opt) => {
@@ -811,7 +923,10 @@ export default function ProductDetail() {
                         <button
                           type="button"
                           key={opt.labelAr}
-                          onClick={() => setSelectedColor(opt.labelAr)}
+                          onClick={() => {
+                            setSelectedColor(opt.labelAr);
+                            setColorErrorHighlight(false);
+                          }}
                           aria-pressed={isSelected}
                           className={`flex items-center justify-center gap-1.5 p-2 rounded-xl border text-xs font-bold transition-all ${
                             isSelected
@@ -835,7 +950,10 @@ export default function ProductDetail() {
                         <button
                           type="button"
                           key={color}
-                          onClick={() => setSelectedColor(color)}
+                          onClick={() => {
+                            setSelectedColor(color);
+                            setColorErrorHighlight(false);
+                          }}
                           aria-pressed={isSelected}
                           className={`flex items-center justify-center gap-1.5 p-2 rounded-xl border text-xs font-bold transition ${
                             isSelected
@@ -865,12 +983,7 @@ export default function ProductDetail() {
                   className="h-12 border-2 border-[#ad842f] text-[#8b6821] hover:bg-[#fdf9ee] font-bold text-xs sm:text-sm"
                   disabled={isPerMeter}
                   onClick={() => {
-                    if (sizeOptions.length && !selectedSize) {
-                      toast.error(lang === "ar" ? "يرجى اختيار المقاس أولاً" : "Please select a size first");
-                      return;
-                    }
-                    if (colorOptions.length && !selectedColor) {
-                      toast.error(lang === "ar" ? "يرجى اختيار اللون أولاً" : "Please select a colour first");
+                    if (!validateVariantSelection()) {
                       return;
                     }
                     addItem({
@@ -895,12 +1008,18 @@ export default function ProductDetail() {
                   {lang === "ar" ? "حجز واتساب" : "WhatsApp"}
                 </Button>
                 <Dialog open={orderOpen} onOpenChange={setOrderOpen}>
-                  <DialogTrigger asChild>
-                    <Button size="lg" className="h-12 font-black text-xs sm:text-sm bg-gradient-to-r from-[#ad842f] to-[#c9a24a] hover:from-[#96702a] hover:to-[#b5913f] text-white shadow-md">
-                      <ArrowRight className="ms-0 me-1.5 h-4 w-4" />
-                      {lang === "ar" ? "اطلب الآن" : "Order Now"}
-                    </Button>
-                  </DialogTrigger>
+                  <Button
+                    size="lg"
+                    className="h-12 font-black text-xs sm:text-sm bg-gradient-to-r from-[#ad842f] to-[#c9a24a] hover:from-[#96702a] hover:to-[#b5913f] text-white shadow-md"
+                    onClick={() => {
+                      if (validateVariantSelection()) {
+                        setOrderOpen(true);
+                      }
+                    }}
+                  >
+                    <ArrowRight className="ms-0 me-1.5 h-4 w-4" />
+                    {lang === "ar" ? "اطلب الآن" : "Order Now"}
+                  </Button>
                   <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto overscroll-contain sm:max-h-[85vh]">
                     <DialogHeader className="border-b pb-3 text-start">
                       <DialogTitle className="text-lg font-bold flex items-center gap-2">
@@ -941,52 +1060,80 @@ export default function ProductDetail() {
                           </div>
                         </div>
 
-                        {/* Quantity and Price */}
-                        <div className="flex items-center justify-between pt-2 border-t border-[#e8dfcf]/70">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-muted-foreground font-medium">{lang === "ar" ? "الكمية:" : "Qty:"}</span>
-                            <div className="inline-flex items-center border border-[#d5af58]/40 rounded-lg bg-white shadow-sm">
-                              <button
-                                type="button"
-                                onClick={() => setDirectQuantity((q) => Math.max(1, q - 1))}
-                                className="px-2.5 py-1 text-[#514c42] hover:text-black transition disabled:opacity-30"
-                                disabled={directQuantity <= 1}
-                                aria-label="Decrease quantity"
-                              >
-                                <Minus className="w-3 h-3" />
-                              </button>
-                              <span className="px-2.5 py-0.5 text-xs font-bold text-[#24211d] min-w-[24px] text-center">
-                                {directQuantity}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => setDirectQuantity((q) => q + 1)}
-                                className="px-2.5 py-1 text-[#514c42] hover:text-black transition"
-                                aria-label="Increase quantity"
-                              >
-                                <Plus className="w-3 h-3" />
-                              </button>
+                        {/* Quantity and Breakdown */}
+                        <div className="space-y-2 pt-2 border-t border-[#e8dfcf]/70">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground font-medium">{lang === "ar" ? "الكمية:" : "Qty:"}</span>
+                              <div className="inline-flex items-center border border-[#d5af58]/40 rounded-lg bg-white shadow-sm">
+                                <button
+                                  type="button"
+                                  onClick={() => setDirectQuantity((q) => Math.max(1, q - 1))}
+                                  className="px-2.5 py-1 text-[#514c42] hover:text-black transition disabled:opacity-30"
+                                  disabled={directQuantity <= 1}
+                                  aria-label="Decrease quantity"
+                                >
+                                  <Minus className="w-3 h-3" />
+                                </button>
+                                <span className="px-2.5 py-0.5 text-xs font-bold text-[#24211d] min-w-[24px] text-center">
+                                  {directQuantity}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setDirectQuantity((q) => q + 1)}
+                                  className="px-2.5 py-1 text-[#514c42] hover:text-black transition"
+                                  aria-label="Increase quantity"
+                                >
+                                  <Plus className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
+
+                            <div className="text-end">
+                              {isPerMeter ? (
+                                <span className="text-xs text-amber-600 font-bold">
+                                  {formatPrice(pricePerMeterValue)} {currency} / م
+                                </span>
+                              ) : (
+                                <span className="text-xs text-[#514c42] font-semibold">
+                                  {formatPrice(finalTotal)} {currency} {directQuantity > 1 ? `× ${directQuantity}` : ""}
+                                </span>
+                              )}
                             </div>
                           </div>
 
-                          <div className="text-end">
-                            {isPerMeter ? (
-                              <span className="text-xs text-amber-600 font-bold">
-                                {formatPrice(pricePerMeterValue)} {currency} / م
-                              </span>
-                            ) : (
-                              <div className="flex items-baseline gap-1.5 justify-end">
-                                {couponState.valid && couponDiscount > 0 && (
-                                  <span className="text-xs text-green-600 font-bold">
-                                    -{formatPrice(couponDiscount * directQuantity)} {currency}
+                          {/* Shipping and Final Total line items */}
+                          {!isPerMeter && (
+                            <div className="pt-2 border-t border-dashed border-[#e8dfcf] space-y-1 text-xs">
+                              {couponState.valid && couponDiscount > 0 && (
+                                <div className="flex items-center justify-between text-emerald-600 font-semibold">
+                                  <span>{lang === "ar" ? "خصم الكوبون:" : "Coupon Discount:"}</span>
+                                  <span>-{formatPrice(couponDiscount * directQuantity)} {currency}</span>
+                                </div>
+                              )}
+                              <div className="flex items-center justify-between text-[#514c42]">
+                                <span className="flex items-center gap-1">
+                                  <Truck className="w-3 h-3 text-[#ad842f]" />
+                                  {lang === "ar" ? "مصاريف الشحن والتوصيل:" : "Shipping & Delivery:"}
+                                </span>
+                                {isFreeShipping || shippingAmount === 0 ? (
+                                  <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                    {lang === "ar" ? "🚚 شحن مجاني" : "🚚 Free Shipping"}
+                                  </span>
+                                ) : (
+                                  <span className="font-bold text-[#24211d]">
+                                    {formatPrice(shippingAmount)} {currency}
                                   </span>
                                 )}
-                                <span className="text-sm font-black text-[#ad842f]">
-                                  {formatPrice(Math.max(0, (finalTotal * directQuantity)))} {currency}
+                              </div>
+                              <div className="flex items-center justify-between pt-1.5 border-t border-[#e8dfcf] font-black text-sm text-[#24211d]">
+                                <span>{lang === "ar" ? "الإجمالي المستحق عند الاستلام:" : "Total upon delivery:"}</span>
+                                <span className="text-base text-[#ad842f]">
+                                  {formatPrice(directOrderTotal)} {currency}
                                 </span>
                               </div>
-                            )}
-                          </div>
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -1101,8 +1248,8 @@ export default function ProductDetail() {
                             </p>
                             <p className="text-[#6b5a2e] leading-relaxed">
                               {lang === "ar"
-                                ? `1. حوّل المبلغ الإجمالي (${formatPrice(Math.max(0, finalTotal * directQuantity))} ${currency}) على رقم 01121748885\n2. أرسل صورة إيصال التحويل على واتساب نفس الرقم\n3. سيتم تأكيد طلبك والبدء في التجهيز فور التحقق.`
-                                : `1. Transfer total amount (${formatPrice(Math.max(0, finalTotal * directQuantity))} ${currency}) to 01121748885\n2. Send receipt screenshot via WhatsApp to the same number\n3. Order confirmed immediately after verification.`}
+                                ? `1. حوّل المبلغ الإجمالي (${formatPrice(directOrderTotal)} ${currency}) على رقم 01121748885\n2. أرسل صورة إيصال التحويل على واتساب نفس الرقم\n3. سيتم تأكيد طلبك والبدء في التجهيز فور التحقق.`
+                                : `1. Transfer total amount (${formatPrice(directOrderTotal)} ${currency}) to 01121748885\n2. Send receipt screenshot via WhatsApp to the same number\n3. Order confirmed immediately after verification.`}
                             </p>
                           </div>
                         )}
@@ -1141,8 +1288,8 @@ export default function ProductDetail() {
                             </>
                           ) : (
                             lang === "ar"
-                              ? `تأكيد الطلب الآن (${formatPrice(Math.max(0, finalTotal * directQuantity))} ${currency})`
-                              : `Confirm Order Now (${formatPrice(Math.max(0, finalTotal * directQuantity))} ${currency})`
+                              ? `تأكيد الطلب الآن (${formatPrice(directOrderTotal)} ${currency})`
+                              : `Confirm Order Now (${formatPrice(directOrderTotal)} ${currency})`
                           )}
                         </Button>
 

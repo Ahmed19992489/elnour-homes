@@ -138,6 +138,14 @@ export default function CartPage() {
     return map;
   }, [products]);
 
+  const cartShipping = useMemo(() => {
+    return items.reduce((acc, item) => {
+      const p = productById.get(item.productId);
+      if (!p || (p as any).isFreeShipping) return acc;
+      return acc + (Number((p as any).shippingCost) || 0);
+    }, 0);
+  }, [items, productById]);
+
   const unavailable = useMemo(
     () => items.filter((i) => !productById.get(i.productId) || productById.get(i.productId)?.isActive !== "yes"),
     [items, productById],
@@ -199,9 +207,21 @@ export default function CartPage() {
         </div>
 
         <div className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-lg bg-muted/50 p-4">
-        <p className="text-lg font-bold">
-          {lang === "ar" ? "الإجمالي" : "Subtotal"}: {priceDisplay(subtotal, lang)}
-        </p>
+          <div className="space-y-1">
+            <p className="text-lg font-bold">
+              {lang === "ar" ? "الإجمالي" : "Total"}: {priceDisplay(subtotal + cartShipping, lang)}
+            </p>
+            <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+              <span>🚚</span>
+              {cartShipping === 0 ? (
+                <span className="text-emerald-700 font-semibold">{lang === "ar" ? "شحن مجاني" : "Free Shipping"}</span>
+              ) : (
+                <span>
+                  {lang === "ar" ? `مصاريف الشحن: ${priceDisplay(cartShipping, lang)}` : `Shipping: ${priceDisplay(cartShipping, lang)}`}
+                </span>
+              )}
+            </p>
+          </div>
           <div className="flex gap-3">
             <Button variant="outline" asChild>
               <Link href="/products">{lang === "ar" ? "متابعة التسوق" : "Continue shopping"}</Link>

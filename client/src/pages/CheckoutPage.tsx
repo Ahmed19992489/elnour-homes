@@ -72,15 +72,27 @@ export default function CheckoutPage() {
     enabled: hydrated && productIds.length > 0,
   });
 
-  const availableItems = useMemo(() => {
+  const productById = useMemo(() => {
     const map = new Map<number, NonNullable<typeof products>[number]>();
     (products ?? []).forEach((p) => map.set(p.id, p));
-    return items.filter((i) => map.get(i.productId)?.isActive === "yes");
-  }, [items, products]);
+    return map;
+  }, [products]);
+
+  const availableItems = useMemo(() => {
+    return items.filter((i) => productById.get(i.productId)?.isActive === "yes");
+  }, [items, productById]);
+
+  const cartShipping = useMemo(() => {
+    return availableItems.reduce((acc, item) => {
+      const p = productById.get(item.productId);
+      if (!p || (p as any).isFreeShipping) return acc;
+      return acc + (Number((p as any).shippingCost) || 0);
+    }, 0);
+  }, [availableItems, productById]);
 
   const { subtotal } = cartTotals(availableItems);
   const discount = couponState.valid ? couponState.discount : 0;
-  const finalTotal = Math.max(0, subtotal - discount);
+  const finalTotal = Math.max(0, subtotal - discount + cartShipping);
 
   const trackPageview = trpc.pageviews.track.useMutation();
   useEffect(() => {
@@ -180,11 +192,6 @@ export default function CheckoutPage() {
     });
   };
 
-  const productById = useMemo(() => {
-    const map = new Map<number, NonNullable<typeof products>[number]>();
-    (products ?? []).forEach((p) => map.set(p.id, p));
-    return map;
-  }, [products]);
 
   if (!hydrated || items.length === 0) {
     return (
@@ -391,11 +398,10 @@ export default function CheckoutPage() {
                     <p className="font-semibold text-[#8b6821] mb-1">
                       {t("تعليمات الدفع:", "Payment Instructions:")}
                     </p>
-                    <p className="text-[#6b5a2e]">
-                      {t(
-                        `1. حوّل المبلغ الإجمالي على رقم 01121748885\n2. أرسل صورة إيصال التحويل على واتساب نفس الرقم\n3. سيتم تأكيد طلبك فور التحقق من التحويل`,
-                        `1. Transfer the total amount to 01121748885\n2. Send the transfer receipt screenshot on WhatsApp to the same number\n3. Your order will be confirmed once the transfer is verified`
-                      )}
+                    <p className="text-[#6b5a2e] whitespace-pre-line">
+                      {lang === "ar"
+                        ? `1. حوّل المبلغ الإجمالي (${priceDisplay(finalTotal, lang)}) على رقم 01121748885\n2. أرسل صورة إيصال التحويل على واتساب نفس الرقم\n3. سيتم تأكيد طلبك فور التحقق من التحويل`
+                        : `1. Transfer the total amount (${priceDisplay(finalTotal, lang)}) to 01121748885\n2. Send the transfer receipt screenshot on WhatsApp to the same number\n3. Your order will be confirmed once the transfer is verified`}
                     </p>
                   </div>
                 )}
@@ -439,6 +445,23 @@ export default function CheckoutPage() {
                   <span>{lang === "ar" ? "المجموع الفرعي" : "Subtotal"}</span>
                   <span>{priceDisplay(subtotal, lang)}</span>
                 </div>
+                <div className="flex justify-between text-sm items-center">
+                  <span className="flex items-center gap-1.5">
+                    <Truck className="h-3.5 w-3.5 text-[#ad842f]" />
+                    {lang === "ar" ? "مصاريف الشحن والتوصيل" : "Shipping & Delivery"}
+                  </span>
+                  <span>
+                    {cartShipping === 0 ? (
+                      <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                        {lang === "ar" ? "🚚 شحن مجاني" : "🚚 Free Shipping"}
+                      </span>
+                    ) : (
+                      <span className="font-semibold text-foreground">
+                        {priceDisplay(cartShipping, lang)}
+                      </span>
+                    )}
+                  </span>
+                </div>
                 {discount > 0 && (
                   <div className="flex justify-between text-sm text-green-600">
                     <span>{lang === "ar" ? "الخصم" : "Discount"}</span>
@@ -446,8 +469,8 @@ export default function CheckoutPage() {
                   </div>
                 )}
                 <div className="flex justify-between border-t border-border/70 pt-3 text-base font-bold">
-                  <span>{lang === "ar" ? "الإجمالي" : "Total"}</span>
-                  <span>{priceDisplay(finalTotal, lang)}</span>
+                  <span>{lang === "ar" ? "الإجمالي المستحق" : "Total Due"}</span>
+                  <span className="text-[#ad842f] text-lg font-black">{priceDisplay(finalTotal, lang)}</span>
                 </div>
               </div>
               <div className="mt-5 space-y-2 text-sm text-muted-foreground">

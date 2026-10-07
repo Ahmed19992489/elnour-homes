@@ -269,6 +269,8 @@ var products = pgTable("products", {
   category: varchar("category", { length: 100 }).default("home-decor"),
   specifications: text("specifications"),
   images: text("images"),
+  shippingCost: varchar("shipping_cost", { length: 50 }).default("0"),
+  isFreeShipping: boolean("is_free_shipping").default(false),
   featured: boolean("featured").default(false),
   isActive: varchar("is_active", { length: 10 }).default("yes").notNull(),
   sortOrder: integer("sort_order").default(0),
@@ -314,6 +316,7 @@ var orders = pgTable("orders", {
   couponCode: varchar("coupon_code", { length: 50 }),
   discountType: varchar("discount_type", { length: 20 }),
   discountValue: varchar("discount_value", { length: 50 }),
+  shippingCost: varchar("shipping_cost", { length: 50 }).default("0"),
   totalAfterDiscount: varchar("total_after_discount", { length: 50 }),
   notes: text("notes"),
   notificationSent: boolean("notification_sent").default(false),
@@ -642,17 +645,20 @@ async function upsertSetting(key, value) {
   });
   return getSetting(key);
 }
-var _productsOriginalPriceChecked = false;
+var _productsColumnsChecked = false;
 async function ensureProductColumns() {
-  if (_productsOriginalPriceChecked) return;
+  if (_productsColumnsChecked) return;
   const url = process.env.DATABASE_URL || ENV.databaseUrl;
   if (!url) return;
   try {
     const rawSql = neon(url);
     await rawSql`ALTER TABLE products ADD COLUMN IF NOT EXISTS original_price VARCHAR(50);`;
-    _productsOriginalPriceChecked = true;
+    await rawSql`ALTER TABLE products ADD COLUMN IF NOT EXISTS shipping_cost VARCHAR(50) DEFAULT '0';`;
+    await rawSql`ALTER TABLE products ADD COLUMN IF NOT EXISTS is_free_shipping BOOLEAN DEFAULT false;`;
+    await rawSql`ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_cost VARCHAR(50) DEFAULT '0';`;
+    _productsColumnsChecked = true;
   } catch (err) {
-    console.error("[Database] Error ensuring original_price column:", err);
+    console.error("[Database] Error ensuring product/order columns:", err);
   }
 }
 async function getActiveProducts() {
@@ -1411,7 +1417,7 @@ ${orderUrl}`
 }
 
 // shared/cartPricing.ts
-function parseJsonOptions(value) {
+function parseJsonOptions2(value) {
   try {
     if (!value) return [];
     const parsed = JSON.parse(value);
@@ -1430,7 +1436,7 @@ function computeCartItemPrice(product, selectedSize, selectedColor) {
     const perMeter = product.pricePerMeter ? parseFloat(String(product.pricePerMeter)) : 0;
     return perMeter || basePrice;
   }
-  const sizeOptions = parseJsonOptions(product.sizeOptions);
+  const sizeOptions = parseJsonOptions2(product.sizeOptions);
   if (sizeOptions.length && selectedSize) {
     const match = sizeOptions.find(
       (opt) => (opt.labelAr ?? "").toLocaleLowerCase() === selectedSize.trim().toLocaleLowerCase() || (opt.labelEn ?? "").toLocaleLowerCase() === selectedSize.trim().toLocaleLowerCase()
@@ -1448,13 +1454,36 @@ function computeCartItemPrice(product, selectedSize, selectedColor) {
   }
   return basePrice;
 }
+function normalizeText(text2) {
+  return text2.trim().toLowerCase().replace(/[أإآ]/g, "\u0627").replace(/ة/g, "\u0647").replace(/ى/g, "\u064A").replace(/[\s\-_]+/g, "");
+}
 function isOptionAvailable(values, jsonOptions, key, selected) {
-  if (!selected) return true;
+  if (!selected || !selected.trim()) return true;
   const legacy = splitOptions(values);
-  const json = parseJsonOptions(jsonOptions);
-  const normalized = selected.trim().toLocaleLowerCase();
-  if (legacy.some((v) => v.toLocaleLowerCase() === normalized)) return true;
-  if (json.some((opt) => String(opt[key] ?? "").toLocaleLowerCase() === normalized)) return true;
+  const json = parseJsonOptions2(jsonOptions);
+  if (legacy.length === 0 && json.length === 0) return true;
+  const normSelected = normalizeText(selected);
+  if (legacy.some((v) => {
+    const nv = normalizeText(v);
+    return nv === normSelected || nv.includes(normSelected) || normSelected.includes(nv);
+  })) {
+    return true;
+  }
+  if (json.some((opt) => {
+    if (typeof opt === "string") {
+      const nv = normalizeText(opt);
+      return nv === normSelected || nv.includes(normSelected) || normSelected.includes(nv);
+    }
+    if (typeof opt === "object" && opt !== null) {
+      const val = String(opt[key] ?? opt.labelAr ?? opt.labelEn ?? opt.name ?? "").trim();
+      if (!val) return false;
+      const nv = normalizeText(val);
+      return nv === normSelected || nv.includes(normSelected) || normSelected.includes(nv);
+    }
+    return false;
+  })) {
+    return true;
+  }
   return false;
 }
 
@@ -1502,11 +1531,6 @@ async function isOwnerOrMasterAdmin(user, ownerOpenId) {
   if (user.openId === ownerOpenId) return true;
   const master = await getMasterAdminOpenId();
   return master !== null && user.openId === master;
-}
-function isAvailableOption(options, selected) {
-  if (!options.length) return !selected;
-  if (!selected) return false;
-  return options.some((option) => option.toLocaleLowerCase() === selected.trim().toLocaleLowerCase());
 }
 var appRouter = router({
   system: systemRouter,
@@ -1590,6 +1614,8 @@ var appRouter = router({
       description: z2.string().optional(),
       price: z2.coerce.number().min(0),
       originalPrice: z2.coerce.number().min(0).nullish(),
+      shippingCost: z2.coerce.number().min(0).optional(),
+      isFreeShipping: z2.boolean().optional(),
       sizes: z2.string().optional(),
       colors: z2.string().optional(),
       sizeOptions: z2.string().optional(),
@@ -1618,6 +1644,8 @@ var appRouter = router({
         category,
         price: String(input.price),
         originalPrice: input.originalPrice !== void 0 && input.originalPrice !== null ? String(input.originalPrice) : null,
+        shippingCost: input.shippingCost !== void 0 ? String(input.shippingCost) : "0",
+        isFreeShipping: Boolean(input.isFreeShipping),
         pricePerMeter: input.pricePerMeter !== void 0 ? String(input.pricePerMeter) : void 0,
         pricingType: input.pricingType ?? "fixed"
       });
@@ -1630,6 +1658,8 @@ var appRouter = router({
       description: z2.string().optional(),
       price: z2.coerce.number().min(0).optional(),
       originalPrice: z2.coerce.number().min(0).nullish(),
+      shippingCost: z2.coerce.number().min(0).optional(),
+      isFreeShipping: z2.boolean().optional(),
       sizes: z2.string().optional(),
       colors: z2.string().optional(),
       sizeOptions: z2.string().optional(),
@@ -1650,6 +1680,8 @@ var appRouter = router({
       if (updateData.originalPrice !== void 0) {
         updateData.originalPrice = updateData.originalPrice !== null && updateData.originalPrice !== void 0 ? String(updateData.originalPrice) : null;
       }
+      if (updateData.shippingCost !== void 0) updateData.shippingCost = String(updateData.shippingCost);
+      if (updateData.isFreeShipping !== void 0) updateData.isFreeShipping = Boolean(updateData.isFreeShipping);
       if (updateData.pricePerMeter !== void 0) updateData.pricePerMeter = String(updateData.pricePerMeter);
       if (updateData.category !== void 0) {
         let category = normalizeCategorySlug(updateData.category || "");
@@ -1720,6 +1752,7 @@ var appRouter = router({
       productId: z2.number().optional(),
       productName: z2.string().optional(),
       productPrice: z2.number().optional(),
+      shippingCost: z2.coerce.number().min(0).optional(),
       selectedSize: z2.string().trim().min(1).max(120).optional(),
       selectedColor: z2.string().trim().min(1).max(120).optional(),
       message: z2.string().optional(),
@@ -1738,12 +1771,26 @@ var appRouter = router({
       const product = input.productId ? await getProductById(input.productId) : void 0;
       if (input.productId && !product) throw new Error("\u0627\u0644\u0645\u0646\u062A\u062C \u063A\u064A\u0631 \u0645\u062A\u0627\u062D \u062D\u0627\u0644\u064A\u064B\u0627");
       const legacySizes = parseProductOptions(product?.sizes);
-      if (!isAvailableOption(legacySizes, input.selectedSize) && !isOptionAvailable(product?.sizes, product?.sizeOptions, "labelAr", input.selectedSize) && !isOptionAvailable(product?.sizes, product?.sizeOptions, "labelEn", input.selectedSize)) {
-        throw new Error("\u064A\u0631\u062C\u0649 \u0627\u062E\u062A\u064A\u0627\u0631 \u0645\u0642\u0627\u0633 \u0645\u062A\u0627\u062D \u0644\u0644\u0645\u0646\u062A\u062C");
+      const jsonSizes = parseJsonOptions(product?.sizeOptions);
+      const hasSizesConfigured = legacySizes.length > 0 || jsonSizes.length > 0;
+      if (hasSizesConfigured) {
+        if (!input.selectedSize) {
+          throw new Error("\u064A\u0631\u062C\u0649 \u0627\u062E\u062A\u064A\u0627\u0631 \u0645\u0642\u0627\u0633 \u0645\u062A\u0627\u062D \u0644\u0644\u0645\u0646\u062A\u062C");
+        }
+        if (!isOptionAvailable(product?.sizes, product?.sizeOptions, "labelAr", input.selectedSize) && !isOptionAvailable(product?.sizes, product?.sizeOptions, "labelEn", input.selectedSize)) {
+          throw new Error("\u064A\u0631\u062C\u0649 \u0627\u062E\u062A\u064A\u0627\u0631 \u0645\u0642\u0627\u0633 \u0645\u062A\u0627\u062D \u0644\u0644\u0645\u0646\u062A\u062C");
+        }
       }
       const legacyColors = parseProductOptions(product?.colors);
-      if (!isAvailableOption(legacyColors, input.selectedColor) && !isOptionAvailable(product?.colors, product?.colorOptions, "labelAr", input.selectedColor) && !isOptionAvailable(product?.colors, product?.colorOptions, "labelEn", input.selectedColor)) {
-        throw new Error("\u064A\u0631\u062C\u0649 \u0627\u062E\u062A\u064A\u0627\u0631 \u0644\u0648\u0646 \u0645\u062A\u0627\u062D \u0644\u0644\u0645\u0646\u062A\u062C");
+      const jsonColors = parseJsonOptions(product?.colorOptions);
+      const hasColorsConfigured = legacyColors.length > 0 || jsonColors.length > 0;
+      if (hasColorsConfigured) {
+        if (!input.selectedColor) {
+          throw new Error("\u064A\u0631\u062C\u0649 \u0627\u062E\u062A\u064A\u0627\u0631 \u0644\u0648\u0646 \u0645\u062A\u0627\u062D \u0644\u0644\u0645\u0646\u062A\u062C");
+        }
+        if (!isOptionAvailable(product?.colors, product?.colorOptions, "labelAr", input.selectedColor) && !isOptionAvailable(product?.colors, product?.colorOptions, "labelEn", input.selectedColor)) {
+          throw new Error("\u064A\u0631\u062C\u0649 \u0627\u062E\u062A\u064A\u0627\u0631 \u0644\u0648\u0646 \u0645\u062A\u0627\u062D \u0644\u0644\u0645\u0646\u062A\u062C");
+        }
       }
       let couponApplied = {
         valid: false,
@@ -1771,17 +1818,20 @@ var appRouter = router({
           }
         }
       }
-      const { referralCode: _referralCode, ...restInput } = input;
+      const effectiveShipping = product?.isFreeShipping ? 0 : Number(input.shippingCost ?? product?.shippingCost ?? 0);
+      const { referralCode: _referralCode, shippingCost: _sc, ...restInput } = input;
+      const baseOrderAmount = input.orderValue ?? Number(product?.price || input.productPrice || 0) + effectiveShipping;
       const orderResult = await createOrder({
         ...restInput,
         productName: product?.nameAr ?? input.productName,
         productPrice: product ? String(product.price) : input.productPrice ? String(input.productPrice) : void 0,
+        shippingCost: String(effectiveShipping),
         userId: ctx.user?.id,
         couponCode: couponApplied.valid ? input.couponCode?.trim().toUpperCase() : void 0,
         discountType: couponApplied.valid ? couponApplied.discount > 0 ? "percent" : "none" : void 0,
         discountValue: couponApplied.valid ? String(couponApplied.discount) : void 0,
         referralCodeUsed: appliedReferralCode,
-        totalAfterDiscount: couponApplied.valid ? String(Math.max(0, (input.orderValue ?? input.productPrice ?? 0) - couponApplied.discount)) : input.productPrice ? String(input.productPrice) : product ? String(product.price) : void 0
+        totalAfterDiscount: String(Math.max(0, baseOrderAmount - couponApplied.discount))
       });
       let notificationSent = false;
       try {
@@ -1856,21 +1906,27 @@ var appRouter = router({
           const product = await getProductById(item.productId);
           if (!product) throw new Error(`\u0627\u0644\u0645\u0646\u062A\u062C \u0631\u0642\u0645 ${item.productId} \u063A\u064A\u0631 \u0645\u062A\u0627\u062D \u062D\u0627\u0644\u064A\u064B\u0627`);
           if (product.isActive !== "yes") throw new Error(`\u0627\u0644\u0645\u0646\u062A\u062C \xAB${product.nameAr}\xBB \u0644\u0645 \u064A\u0639\u062F \u0645\u062A\u0627\u062D\u064B\u0627`);
-          const hasJsonSizes = Boolean(product.sizeOptions && product.sizeOptions.trim());
           const legacySizes = parseProductOptions(product.sizes);
-          if ((hasJsonSizes || legacySizes.length) && !item.selectedSize) {
-            throw new Error(`\u064A\u0631\u062C\u0649 \u0627\u062E\u062A\u064A\u0627\u0631 \u0645\u0642\u0627\u0633 \u0644\u0644\u0645\u0646\u062A\u062C \xAB${product.nameAr}\xBB`);
+          const jsonSizes = parseJsonOptions(product.sizeOptions);
+          const hasSizesConfigured = legacySizes.length > 0 || jsonSizes.length > 0;
+          if (hasSizesConfigured) {
+            if (!item.selectedSize) {
+              throw new Error(`\u064A\u0631\u062C\u0649 \u0627\u062E\u062A\u064A\u0627\u0631 \u0645\u0642\u0627\u0633 \u0644\u0644\u0645\u0646\u062A\u062C \xAB${product.nameAr}\xBB`);
+            }
+            if (!isOptionAvailable(product.sizes, product.sizeOptions, "labelAr", item.selectedSize) && !isOptionAvailable(product.sizes, product.sizeOptions, "labelEn", item.selectedSize)) {
+              throw new Error(`\u0627\u0644\u0645\u0642\u0627\u0633 \u0627\u0644\u0645\u062E\u062A\u0627\u0631 \u063A\u064A\u0631 \u0645\u062A\u0627\u062D \u0644\u0644\u0645\u0646\u062A\u062C \xAB${product.nameAr}\xBB`);
+            }
           }
-          const legacyColors = parseProductOptions(product.colors);
-          const hasJsonColors = Boolean(product.colorOptions && product.colorOptions.trim());
-          if ((hasJsonColors || legacyColors.length) && !item.selectedColor) {
-            throw new Error(`\u064A\u0631\u062C\u0649 \u0627\u062E\u062A\u064A\u0627\u0631 \u0644\u0648\u0646 \u0644\u0644\u0645\u0646\u062A\u062C \xAB${product.nameAr}\xBB`);
-          }
-          if (!isAvailableOption(legacySizes, item.selectedSize) && !isOptionAvailable(product.sizes, product.sizeOptions, "labelAr", item.selectedSize) && !isOptionAvailable(product.sizes, product.sizeOptions, "labelEn", item.selectedSize)) {
-            throw new Error(`\u0627\u0644\u0645\u0642\u0627\u0633 \u0627\u0644\u0645\u062E\u062A\u0627\u0631 \u063A\u064A\u0631 \u0645\u062A\u0627\u062D \u0644\u0644\u0645\u0646\u062A\u062C \xAB${product.nameAr}\xBB`);
-          }
-          if (!isAvailableOption(legacyColors, item.selectedColor) && !isOptionAvailable(product.colors, product.colorOptions, "labelAr", item.selectedColor) && !isOptionAvailable(product.colors, product.colorOptions, "labelEn", item.selectedColor)) {
-            throw new Error(`\u0627\u0644\u0644\u0648\u0646 \u0627\u0644\u0645\u062E\u062A\u0627\u0631 \u063A\u064A\u0631 \u0645\u062A\u0627\u062D \u0644\u0644\u0645\u0646\u062A\u062C \xAB${product.nameAr}\xBB`);
+          const legacyColors = parseProductOptions(product?.colors);
+          const jsonColors = parseJsonOptions(product.colorOptions);
+          const hasColorsConfigured = legacyColors.length > 0 || jsonColors.length > 0;
+          if (hasColorsConfigured) {
+            if (!item.selectedColor) {
+              throw new Error(`\u064A\u0631\u062C\u0649 \u0627\u062E\u062A\u064A\u0627\u0631 \u0644\u0648\u0646 \u0644\u0644\u0645\u0646\u062A\u062C \xAB${product.nameAr}\xBB`);
+            }
+            if (!isOptionAvailable(product?.colors, product.colorOptions, "labelAr", item.selectedColor) && !isOptionAvailable(product?.colors, product.colorOptions, "labelEn", item.selectedColor)) {
+              throw new Error(`\u0627\u0644\u0644\u0648\u0646 \u0627\u0644\u0645\u062E\u062A\u0627\u0631 \u063A\u064A\u0631 \u0645\u062A\u0627\u062D \u0644\u0644\u0645\u0646\u062A\u062C \xAB${product.nameAr}\xBB`);
+            }
           }
           const unitPrice = computeCartItemPrice(product, item.selectedSize, item.selectedColor);
           const lineTotal = Math.round(unitPrice * item.quantity * 100) / 100;
@@ -1885,6 +1941,10 @@ var appRouter = router({
         })
       );
       const subtotal = Math.round(items.reduce((sum, i) => sum + i.lineTotal, 0) * 100) / 100;
+      const totalShipping = items.reduce((acc, i) => {
+        if (i.product.isFreeShipping) return acc;
+        return acc + (Number(i.product.shippingCost) || 0);
+      }, 0);
       let couponApplied = { valid: false, discount: 0 };
       if (input.couponCode && input.couponCode.trim()) {
         const now = /* @__PURE__ */ new Date();
@@ -1907,6 +1967,7 @@ var appRouter = router({
         productId: items[0].product.id,
         productName: itemSummary.join(" | "),
         productPrice: String(Math.max(0, beforeDiscount - couponApplied.discount)),
+        shippingCost: String(totalShipping),
         selectedSize: itemSummary.join(" | ").slice(0, 120),
         selectedColor: void 0,
         message: [input.message || ""].filter(Boolean).join(" ") || void 0,
@@ -1914,7 +1975,7 @@ var appRouter = router({
         couponCode: couponApplied.valid ? input.couponCode?.trim().toUpperCase() : void 0,
         discountType: couponApplied.valid ? couponApplied.discount > 0 ? "percent" : "none" : void 0,
         discountValue: couponApplied.valid ? String(couponApplied.discount) : void 0,
-        totalAfterDiscount: couponApplied.valid ? String(Math.max(0, subtotal - couponApplied.discount)) : String(beforeDiscount),
+        totalAfterDiscount: couponApplied.valid ? String(Math.max(0, subtotal + totalShipping - couponApplied.discount)) : String(beforeDiscount + totalShipping),
         userId: ctx.user?.id,
         utmSource: input.utmSource,
         utmMedium: input.utmMedium,
@@ -1932,7 +1993,8 @@ var appRouter = router({
           `\u0627\u0644\u0647\u0627\u062A\u0641: ${input.customerPhone}`,
           input.customerAddress ? `\u0627\u0644\u0639\u0646\u0648\u0627\u0646: ${input.customerAddress}` : "",
           ...items.map((i) => `\u2022 ${i.product.nameAr} | ${i.selectedSize || "\u2014"} | ${i.selectedColor || "\u2014"} | \xD7${i.quantity} | ${i.lineTotal} \u062C.\u0645`),
-          `\u0627\u0644\u0625\u062C\u0645\u0627\u0644\u064A: ${subtotal} \u062C.\u0645` + (couponApplied.valid ? ` (\u062E\u0635\u0645 ${couponApplied.discount} \u062C.\u0645)` : ""),
+          totalShipping > 0 ? `\u0627\u0644\u0634\u062D\u0646: ${totalShipping} \u062C.\u0645` : "\u0627\u0644\u0634\u062D\u0646: \u0645\u062C\u0627\u0646\u064A",
+          `\u0627\u0644\u0625\u062C\u0645\u0627\u0644\u064A \u0627\u0644\u0646\u0647\u0627\u0626\u064A: ${Math.max(0, subtotal + totalShipping - couponApplied.discount)} \u062C.\u0645` + (couponApplied.valid ? ` (\u062E\u0635\u0645 ${couponApplied.discount} \u062C.\u0645)` : ""),
           input.utmSource ? `\u0645\u0635\u062F\u0631 \u0627\u0644\u0625\u0639\u0644\u0627\u0646: ${input.utmSource}` : ""
         ].filter(Boolean).join("\n");
         await notifyOwner({

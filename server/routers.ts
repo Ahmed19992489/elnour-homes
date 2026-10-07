@@ -184,6 +184,8 @@ export const appRouter = router({
         description: z.string().optional(),
         price: z.coerce.number().min(0),
         originalPrice: z.coerce.number().min(0).nullish(),
+        shippingCost: z.coerce.number().min(0).optional(),
+        isFreeShipping: z.boolean().optional(),
         sizes: z.string().optional(),
         colors: z.string().optional(),
         sizeOptions: z.string().optional(),
@@ -213,6 +215,8 @@ export const appRouter = router({
           category,
           price: String(input.price),
           originalPrice: input.originalPrice !== undefined && input.originalPrice !== null ? String(input.originalPrice) : null,
+          shippingCost: input.shippingCost !== undefined ? String(input.shippingCost) : "0",
+          isFreeShipping: Boolean(input.isFreeShipping),
           pricePerMeter: input.pricePerMeter !== undefined ? String(input.pricePerMeter) : undefined,
           pricingType: input.pricingType ?? "fixed",
         });
@@ -226,6 +230,8 @@ export const appRouter = router({
         description: z.string().optional(),
         price: z.coerce.number().min(0).optional(),
         originalPrice: z.coerce.number().min(0).nullish(),
+        shippingCost: z.coerce.number().min(0).optional(),
+        isFreeShipping: z.boolean().optional(),
         sizes: z.string().optional(),
         colors: z.string().optional(),
         sizeOptions: z.string().optional(),
@@ -247,6 +253,8 @@ export const appRouter = router({
         if (updateData.originalPrice !== undefined) {
           updateData.originalPrice = updateData.originalPrice !== null && updateData.originalPrice !== undefined ? String(updateData.originalPrice) : null;
         }
+        if (updateData.shippingCost !== undefined) updateData.shippingCost = String(updateData.shippingCost);
+        if (updateData.isFreeShipping !== undefined) updateData.isFreeShipping = Boolean(updateData.isFreeShipping);
         if (updateData.pricePerMeter !== undefined) updateData.pricePerMeter = String(updateData.pricePerMeter);
         if (updateData.category !== undefined) {
           let category = normalizeCategorySlug(updateData.category || "");
@@ -328,6 +336,7 @@ export const appRouter = router({
         productId: z.number().optional(),
         productName: z.string().optional(),
         productPrice: z.number().optional(),
+        shippingCost: z.coerce.number().min(0).optional(),
         selectedSize: z.string().trim().min(1).max(120).optional(),
         selectedColor: z.string().trim().min(1).max(120).optional(),
         message: z.string().optional(),
@@ -346,14 +355,32 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         const product = input.productId ? await db.getProductById(input.productId) : undefined;
         if (input.productId && !product) throw new Error("المنتج غير متاح حاليًا");
-        // Validate size/color against legacy comma lists AND the JSON options (per-size prices)
+
+        // Validate size/color against options only if product has options configured
         const legacySizes = parseProductOptions(product?.sizes);
-        if (!isAvailableOption(legacySizes, input.selectedSize) && !isOptionAvailable(product?.sizes, product?.sizeOptions, "labelAr", input.selectedSize) && !isOptionAvailable(product?.sizes, product?.sizeOptions, "labelEn", input.selectedSize)) {
-          throw new Error("يرجى اختيار مقاس متاح للمنتج");
+        const jsonSizes = parseJsonOptions<Record<string, unknown>>(product?.sizeOptions);
+        const hasSizesConfigured = legacySizes.length > 0 || jsonSizes.length > 0;
+        if (hasSizesConfigured) {
+          if (!input.selectedSize) {
+            throw new Error("يرجى اختيار مقاس متاح للمنتج");
+          }
+          if (!isOptionAvailable(product?.sizes, product?.sizeOptions, "labelAr", input.selectedSize) &&
+              !isOptionAvailable(product?.sizes, product?.sizeOptions, "labelEn", input.selectedSize)) {
+            throw new Error("يرجى اختيار مقاس متاح للمنتج");
+          }
         }
-        const legacyColors = parseProductOptions(product?.colors);
-        if (!isAvailableOption(legacyColors, input.selectedColor) && !isOptionAvailable(product?.colors, product?.colorOptions, "labelAr", input.selectedColor) && !isOptionAvailable(product?.colors, product?.colorOptions, "labelEn", input.selectedColor)) {
-          throw new Error("يرجى اختيار لون متاح للمنتج");
+
+        const legacyColors = parseProductOptions((product as any)?.colors);
+        const jsonColors = parseJsonOptions<Record<string, unknown>>(product?.colorOptions);
+        const hasColorsConfigured = legacyColors.length > 0 || jsonColors.length > 0;
+        if (hasColorsConfigured) {
+          if (!input.selectedColor) {
+            throw new Error("يرجى اختيار لون متاح للمنتج");
+          }
+          if (!isOptionAvailable((product as any)?.colors, product?.colorOptions, "labelAr", input.selectedColor) &&
+              !isOptionAvailable((product as any)?.colors, product?.colorOptions, "labelEn", input.selectedColor)) {
+            throw new Error("يرجى اختيار لون متاح للمنتج");
+          }
         }
 
         // Validate coupon if provided
@@ -395,20 +422,22 @@ export const appRouter = router({
           }
         }
 
+        const effectiveShipping = product?.isFreeShipping ? 0 : Number(input.shippingCost ?? product?.shippingCost ?? 0);
+
         // Create the order (exclude client-only referralCode from the insert payload)
-        const { referralCode: _referralCode, ...restInput } = input;
+        const { referralCode: _referralCode, shippingCost: _sc, ...restInput } = input;
+        const baseOrderAmount = input.orderValue ?? (Number(product?.price || input.productPrice || 0) + effectiveShipping);
         const orderResult = await db.createOrder({
           ...restInput,
           productName: product?.nameAr ?? input.productName,
           productPrice: product ? String(product.price) : (input.productPrice ? String(input.productPrice) : undefined),
+          shippingCost: String(effectiveShipping),
           userId: ctx.user?.id,
           couponCode: couponApplied.valid ? input.couponCode?.trim().toUpperCase() : undefined,
           discountType: couponApplied.valid ? (couponApplied.discount > 0 ? "percent" : "none") : undefined,
           discountValue: couponApplied.valid ? String(couponApplied.discount) : undefined,
           referralCodeUsed: appliedReferralCode,
-          totalAfterDiscount: couponApplied.valid
-            ? String(Math.max(0, (input.orderValue ?? input.productPrice ?? 0) - couponApplied.discount))
-            : (input.productPrice ? String(input.productPrice) : (product ? String(product.price) : undefined)),
+          totalAfterDiscount: String(Math.max(0, baseOrderAmount - couponApplied.discount)),
         });
 
         // Send notification to owner
@@ -492,21 +521,30 @@ export const appRouter = router({
             const product = await db.getProductById(item.productId);
             if (!product) throw new Error(`المنتج رقم ${item.productId} غير متاح حاليًا`);
             if (product.isActive !== "yes") throw new Error(`المنتج «${product.nameAr}» لم يعد متاحًا`);
-            const hasJsonSizes = Boolean(product.sizeOptions && product.sizeOptions.trim());
             const legacySizes = parseProductOptions(product.sizes);
-            if ((hasJsonSizes || legacySizes.length) && !item.selectedSize) {
-              throw new Error(`يرجى اختيار مقاس للمنتج «${product.nameAr}»`);
+            const jsonSizes = parseJsonOptions<Record<string, unknown>>(product.sizeOptions);
+            const hasSizesConfigured = legacySizes.length > 0 || jsonSizes.length > 0;
+            if (hasSizesConfigured) {
+              if (!item.selectedSize) {
+                throw new Error(`يرجى اختيار مقاس للمنتج «${product.nameAr}»`);
+              }
+              if (!isOptionAvailable(product.sizes, product.sizeOptions, "labelAr", item.selectedSize) &&
+                  !isOptionAvailable(product.sizes, product.sizeOptions, "labelEn", item.selectedSize)) {
+                throw new Error(`المقاس المختار غير متاح للمنتج «${product.nameAr}»`);
+              }
             }
-            const legacyColors = parseProductOptions(product.colors);
-            const hasJsonColors = Boolean(product.colorOptions && product.colorOptions.trim());
-            if ((hasJsonColors || legacyColors.length) && !item.selectedColor) {
-              throw new Error(`يرجى اختيار لون للمنتج «${product.nameAr}»`);
-            }
-            if (!isAvailableOption(legacySizes, item.selectedSize) && !isOptionAvailable(product.sizes, product.sizeOptions, "labelAr", item.selectedSize) && !isOptionAvailable(product.sizes, product.sizeOptions, "labelEn", item.selectedSize)) {
-              throw new Error(`المقاس المختار غير متاح للمنتج «${product.nameAr}»`);
-            }
-            if (!isAvailableOption(legacyColors, item.selectedColor) && !isOptionAvailable(product.colors, product.colorOptions, "labelAr", item.selectedColor) && !isOptionAvailable(product.colors, product.colorOptions, "labelEn", item.selectedColor)) {
-              throw new Error(`اللون المختار غير متاح للمنتج «${product.nameAr}»`);
+
+            const legacyColors = parseProductOptions((product as any)?.colors);
+            const jsonColors = parseJsonOptions<Record<string, unknown>>(product.colorOptions);
+            const hasColorsConfigured = legacyColors.length > 0 || jsonColors.length > 0;
+            if (hasColorsConfigured) {
+              if (!item.selectedColor) {
+                throw new Error(`يرجى اختيار لون للمنتج «${product.nameAr}»`);
+              }
+              if (!isOptionAvailable((product as any)?.colors, product.colorOptions, "labelAr", item.selectedColor) &&
+                  !isOptionAvailable((product as any)?.colors, product.colorOptions, "labelEn", item.selectedColor)) {
+                throw new Error(`اللون المختار غير متاح للمنتج «${product.nameAr}»`);
+              }
             }
             const unitPrice = computeCartItemPrice(product, item.selectedSize, item.selectedColor);
             const lineTotal = Math.round(unitPrice * item.quantity * 100) / 100;
@@ -522,6 +560,10 @@ export const appRouter = router({
         );
 
         const subtotal = Math.round(items.reduce((sum, i) => sum + i.lineTotal, 0) * 100) / 100;
+        const totalShipping = items.reduce((acc, i) => {
+          if (i.product.isFreeShipping) return acc;
+          return acc + (Number(i.product.shippingCost) || 0);
+        }, 0);
 
         // 2. Validate & apply coupon on the subtotal
         let couponApplied = { valid: false, discount: 0 } as { valid: boolean; discount: number };
@@ -559,6 +601,7 @@ export const appRouter = router({
           productId: items[0].product.id,
           productName: itemSummary.join(" | "),
           productPrice: String(Math.max(0, beforeDiscount - couponApplied.discount)),
+          shippingCost: String(totalShipping),
           selectedSize: itemSummary.join(" | ").slice(0, 120),
           selectedColor: undefined,
           message: [input.message || ""].filter(Boolean).join(" ") || undefined,
@@ -567,8 +610,8 @@ export const appRouter = router({
           discountType: couponApplied.valid ? (couponApplied.discount > 0 ? "percent" : "none") : undefined,
           discountValue: couponApplied.valid ? String(couponApplied.discount) : undefined,
           totalAfterDiscount: couponApplied.valid
-            ? String(Math.max(0, subtotal - couponApplied.discount))
-            : String(beforeDiscount),
+            ? String(Math.max(0, subtotal + totalShipping - couponApplied.discount))
+            : String(beforeDiscount + totalShipping),
           userId: ctx.user?.id,
           utmSource: input.utmSource,
           utmMedium: input.utmMedium,
@@ -588,7 +631,8 @@ export const appRouter = router({
             `الهاتف: ${input.customerPhone}`,
             input.customerAddress ? `العنوان: ${input.customerAddress}` : "",
             ...items.map((i) => `• ${i.product.nameAr} | ${i.selectedSize || "—"} | ${i.selectedColor || "—"} | ×${i.quantity} | ${i.lineTotal} ج.م`),
-            `الإجمالي: ${subtotal} ج.م` + (couponApplied.valid ? ` (خصم ${couponApplied.discount} ج.م)` : ""),
+            totalShipping > 0 ? `الشحن: ${totalShipping} ج.م` : "الشحن: مجاني",
+            `الإجمالي النهائي: ${Math.max(0, subtotal + totalShipping - couponApplied.discount)} ج.م` + (couponApplied.valid ? ` (خصم ${couponApplied.discount} ج.م)` : ""),
             input.utmSource ? `مصدر الإعلان: ${input.utmSource}` : "",
           ].filter(Boolean).join("\n");
 
